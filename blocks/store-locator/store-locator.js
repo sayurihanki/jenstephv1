@@ -663,7 +663,7 @@ function getTodayHours(store) {
 }
 
 /**
- * Render a single store card
+ * Render a single store card (matches info window design)
  * @param {Object} store - Store object
  * @param {boolean} showDistance - Whether to show distance
  * @returns {Element} Store card element
@@ -679,111 +679,100 @@ function renderStoreCard(store) {
   }
 
   const isOpen = isStoreOpen(store);
+  const hoursText = getTodayHours(store);
 
-  // Diagnostic logging for missing data
-  console.log(`🔍 Rendering card for: ${store.name}`);
-  console.log('  📍 Distance:', store.distance !== undefined ? `${store.distance.toFixed(1)} miles` : '❌ NOT CALCULATED (no user location)');
-  console.log('  📞 Phone:', store.contact?.phone || '❌ NOT AVAILABLE FROM GOOGLE');
-  console.log('  🕒 Hours:', store.hours && Object.keys(store.hours).length > 0 ? '✅ Available' : '❌ NOT AVAILABLE FROM GOOGLE');
-
-  // Header with name, status, and distance
+  // Card Header with badges
   const header = document.createElement('div');
-  header.classList.add('store-card-header');
+  header.classList.add('card-header');
 
+  // Store name (left side)
   const name = document.createElement('h3');
   name.classList.add('store-name');
   name.textContent = store.name;
   header.appendChild(name);
 
-  const metaRow = document.createElement('div');
-  metaRow.classList.add('store-meta-row');
+  // Badges container (right side)
+  const badges = document.createElement('div');
+  badges.classList.add('card-badges');
 
   // Status badge
-  const statusBadge = document.createElement('span');
-  statusBadge.classList.add('store-status-badge', isOpen ? 'open' : 'closed');
-  statusBadge.innerHTML = isOpen ? '● OPEN' : '○ CLOSED';
-  metaRow.appendChild(statusBadge);
+  const statusBadge = document.createElement('div');
+  statusBadge.classList.add('card-status-badge', isOpen ? 'open' : 'closed');
+  statusBadge.innerHTML = `
+    <svg class="status-icon" viewBox="0 0 8 8" width="8" height="8">
+      <circle cx="4" cy="4" r="4" fill="currentColor"/>
+    </svg>
+    ${isOpen ? 'OPEN' : 'CLOSED'}
+  `;
+  badges.appendChild(statusBadge);
 
-  // Distance (if available)
+  // Distance badge (if available)
   if (store.distance !== undefined) {
-    const distance = document.createElement('span');
-    distance.classList.add('store-distance-badge');
-    distance.innerHTML = `📍 ${store.distance.toFixed(1)} miles away`;
-    metaRow.appendChild(distance);
+    const distanceBadge = document.createElement('div');
+    distanceBadge.classList.add('card-distance-badge');
+    distanceBadge.innerHTML = `
+      <svg class="distance-icon" viewBox="0 0 24 24" width="14" height="14">
+        <path fill="currentColor" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+      </svg>
+      ${store.distance.toFixed(1)} miles away
+    `;
+    badges.appendChild(distanceBadge);
   }
 
-  header.appendChild(metaRow);
+  header.appendChild(badges);
   card.appendChild(header);
 
-  // Star rating row (from Google Places API)
+  // Star rating (if available)
   if (store.rating && store.userRatingsTotal) {
     const ratingRow = document.createElement('div');
-    ratingRow.classList.add('store-rating');
+    ratingRow.classList.add('card-rating');
     const stars = '★'.repeat(Math.round(store.rating)) + '☆'.repeat(5 - Math.round(store.rating));
     ratingRow.innerHTML = `<span class="stars">${stars}</span> <span class="rating-value">${store.rating}</span> <span class="rating-count">(${store.userRatingsTotal})</span>`;
     card.appendChild(ratingRow);
   }
 
-  // Contact Info Container (Address + Phone grouped)
-  const contactInfo = document.createElement('div');
-  contactInfo.classList.add('store-contact-info');
-
-  // Address (from Google Places API formatted_address)
+  // Address
   const address = document.createElement('address');
-  address.classList.add('store-address');
-  address.innerHTML = `<span class="address-icon">📍</span> ${store.address.street}, ${store.address.city}, ${store.address.state} ${store.address.zip}`;
-  contactInfo.appendChild(address);
+  address.classList.add('card-address');
+  address.textContent = `${store.address.street}, ${store.address.city}, ${store.address.state} ${store.address.zip}${store.address.country ? `, ${store.address.country}` : ''}`;
+  card.appendChild(address);
 
-  // Phone number (from Google Places API)
-  if (store.contact.phone) {
+  // Phone (if available)
+  if (store.contact?.phone) {
     const phone = document.createElement('div');
-    phone.classList.add('store-phone');
-    phone.innerHTML = `<span class="phone-icon">📞</span> <a href="tel:${store.contact.phone.replace(/\D/g, '')}">${store.contact.phone}</a>`;
-    contactInfo.appendChild(phone);
+    phone.classList.add('card-phone');
+    phone.innerHTML = `<a href="tel:${store.contact.phone.replace(/\D/g, '')}">${store.contact.phone}</a>`;
+    card.appendChild(phone);
   }
 
-  card.appendChild(contactInfo);
-
-  // Details Container (Services + Hours grouped)
-  const hasServices = store.services && store.services.length > 0;
-  const hoursText = getTodayHours(store);
-  const hasHours = hoursText && hoursText !== 'Hours not available';
-
-  if (hasServices || hasHours) {
-    const detailsContainer = document.createElement('div');
-    detailsContainer.classList.add('store-details-container');
-
-    // Service tags/badges (from DA.live custom services)
-    if (hasServices) {
-      const services = document.createElement('div');
-      services.classList.add('store-services');
-      store.services.slice(0, 3).forEach((service) => {
-        const badge = document.createElement('span');
-        badge.classList.add('service-badge');
-        badge.textContent = service;
-        services.appendChild(badge);
-      });
-      detailsContainer.appendChild(services);
-    }
-
-    // Today's hours (from Google Places API)
-    if (hasHours) {
-      const hours = document.createElement('div');
-      hours.classList.add('store-hours');
-      hours.innerHTML = `<span class="hours-icon">🕒</span> ${hoursText}`;
-      detailsContainer.appendChild(hours);
-    }
-
-    card.appendChild(detailsContainer);
+  // Service tags (if available)
+  if (store.services && store.services.length > 0) {
+    const servicesTags = document.createElement('div');
+    servicesTags.classList.add('card-services');
+    store.services.slice(0, 4).forEach((service) => {
+      const tag = document.createElement('span');
+      tag.classList.add('card-service-tag');
+      tag.textContent = service;
+      servicesTags.appendChild(tag);
+    });
+    card.appendChild(servicesTags);
   }
 
-  // Actions
+  // Hours text
+  if (hoursText && hoursText !== 'Hours not available') {
+    const hours = document.createElement('div');
+    hours.classList.add('card-hours');
+    hours.textContent = hoursText;
+    card.appendChild(hours);
+  }
+
+  // Action buttons
   const actions = document.createElement('div');
-  actions.classList.add('store-actions');
+  actions.classList.add('card-actions');
 
+  // Directions button
   const directionsBtn = document.createElement('a');
-  directionsBtn.classList.add('btn-directions');
-  // Use Place ID if available for rich place info, otherwise fall back to coordinates
+  directionsBtn.classList.add('card-action-btn', 'btn-directions');
   if (store.placeId) {
     directionsBtn.href = `https://www.google.com/maps/place/?q=place_id:${store.placeId}`;
   } else {
@@ -791,40 +780,42 @@ function renderStoreCard(store) {
   }
   directionsBtn.target = '_blank';
   directionsBtn.rel = 'noopener noreferrer';
-  directionsBtn.innerHTML = '📍 Get Directions';
+  directionsBtn.innerHTML = `
+    <svg viewBox="0 0 24 24" width="16" height="16">
+      <path fill="currentColor" d="M21.71 11.29l-9-9a.996.996 0 00-1.41 0l-9 9a.996.996 0 000 1.41l9 9c.39.39 1.02.39 1.41 0l9-9a.996.996 0 000-1.41zM14 14.5V12h-4v3H8v-4c0-.55.45-1 1-1h5V7.5l3.5 3.5-3.5 3.5z"/>
+    </svg>
+    Get Directions
+  `;
+  actions.appendChild(directionsBtn);
 
+  // Set as My Store button
+  const preferredStoreId = localStorage.getItem('preferredStore');
   const setStoreBtn = document.createElement('button');
-  setStoreBtn.classList.add('btn-set-store');
+  setStoreBtn.classList.add('card-action-btn', 'btn-set-store');
   setStoreBtn.dataset.storeId = store.id;
 
-  // Check if this is already the preferred store
-  const preferredStoreId = localStorage.getItem('preferredStore');
-
   if (preferredStoreId === store.id) {
-    // This IS the preferred store - show disabled state
-    setStoreBtn.innerHTML = '✓ My Store';
+    setStoreBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="16" height="16">
+        <path fill="currentColor" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+      </svg>
+      My Store
+    `;
     setStoreBtn.disabled = true;
-  } else if (preferredStoreId) {
-    // A DIFFERENT store is preferred - show "Switch" button
-    setStoreBtn.innerHTML = '↔️ Switch to This Store';
-    setStoreBtn.addEventListener('click', () => {
-      setPreferredStore(store.id, store.name);
-
-      // Trigger page refresh to show new hero card
-      window.location.reload();
-    });
+    setStoreBtn.classList.add('selected');
   } else {
-    // NO store is preferred - show "Set" button
-    setStoreBtn.innerHTML = '⭐ Set as My Store';
+    setStoreBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="16" height="16">
+        <path fill="currentColor" d="M22 9.24l-7.19-.62L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27 18.18 21l-1.63-7.03L22 9.24zM12 15.4l-3.76 2.27 1-4.28-3.32-2.88 4.38-.38L12 6.1l1.71 4.04 4.38.38-3.32 2.88 1 4.28L12 15.4z"/>
+      </svg>
+      Set as My Store
+    `;
     setStoreBtn.addEventListener('click', () => {
       setPreferredStore(store.id, store.name);
-
-      // Trigger page refresh to show hero card
       window.location.reload();
     });
   }
 
-  actions.appendChild(directionsBtn);
   actions.appendChild(setStoreBtn);
   card.appendChild(actions);
 

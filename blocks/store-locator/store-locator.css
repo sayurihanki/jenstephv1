@@ -15,6 +15,10 @@
    DESIGN TOKENS - UNIFIED SYSTEM
    ============================================ */
 .store-locator {
+  /* Standard block pattern - inherit wrapper width constraints */
+  width: 100%;
+  box-sizing: border-box;
+
   /* Heights */
   --store-map-height: 600px;
   --store-map-height-mobile: 400px;
@@ -68,19 +72,14 @@
   --sl-transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   --sl-transition-base: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   --sl-transition-slow: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-
-  /* Container - Follows site's base width system */
-  width: 100%;
 }
 
 .store-locator-container {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-large); /* Reduced from xlarge for tighter layout */
-  max-width: 100%; /* Prevent overflow on mobile */
-  box-sizing: border-box; /* Include padding in width */
-
-  /* Width and centering inherited from main > .section > div (max-width: 1200px, margin: auto) */
+  gap: var(--spacing-large);
+  width: 100%;
+  box-sizing: border-box;
 
   /* Adobe Commerce: Prevent layout shift by NOT setting any height constraints */
 
@@ -537,109 +536,165 @@
 }
 
 /* ============================================
-   STORE CARDS - MODERN ELEVATED DESIGN
+   STORE CARDS - CLEAN SIMPLE DESIGN
    ============================================ */
 .store-card {
   background: #fff;
-  border: 1px solid #e5e5e5;
+  border: 1px solid #e0e0e0;
   border-radius: 8px;
-  padding: 14px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 12px;
   transition: all 0.2s ease;
   box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
 }
 
 .store-card:hover {
-  box-shadow: 0 4px 12px rgb(0 0 0 / 10%);
-  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 12%);
+  border-color: #d0d0d0;
 }
 
-/* Store Photo - Full-bleed image */
-
-/* Store Photo - Removed per user request */
-
-/* Store Card Header - Name Left, Status Right */
-.store-card-header {
+/* Card Header - Store name + badges */
+.card-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 4px;
+  gap: 16px;
 }
 
+.card-badges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Store Name */
 .store-name {
   font-size: 18px;
   font-weight: 600;
   line-height: 1.3;
-  color: #1a1a1a;
+  color: #202124;
   margin: 0;
   overflow-wrap: break-word;
   flex: 1;
 }
 
-/* Meta Row - Status and Distance Stacked on Right */
-.store-meta-row {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-/* Store Status Badge - Simple */
-.store-status-badge {
+/* Status Badge */
+.card-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 4px 10px;
   border-radius: 12px;
   font-size: 11px;
   font-weight: 600;
-  white-space: nowrap;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
-}
-
-.store-status-badge.open {
-  background: #ecfdf5;
-  color: #059669;
-}
-
-.store-status-badge.closed {
-  background: #fef2f2;
-  color: #dc2626;
-}
-
-/* Distance Badge - Blue Accent to Match Reference */
-.store-distance-badge {
-  font-size: 13px;
-  font-weight: 500;
-  color: #2563eb;
   white-space: nowrap;
 }
 
-/* Star Rating Row from Google Places */
-.store-rating {
+.card-status-badge.open {
+  background: #e6f4ea;
+  color: #137333;
+}
+
+.card-status-badge.closed {
+  background: #fce8e6;
+  color: #c5221f;
+}
+
+.card-status-badge .status-icon {
+  width: 8px;
+  height: 8px;
+}
+
+/* Distance Badge */
+.card-distance-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #1a73e8;
+  font-weight: 500;
+}
+
+.card-distance-badge .distance-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* Rating */
+.card-rating {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
-  margin-bottom: 2px;
+  font-size: 14px;
 }
 
-.store-rating .stars {
-  color: #fbbf24;
+.card-rating .stars {
+  color: #fbbc04;
+  font-size: 14px;
   letter-spacing: 1px;
-  font-size: 15px;
 }
 
-.store-rating .rating-value {
+.card-rating .rating-value {
   font-weight: 500;
-  color: #1a1a1a;
-  font-size: 13px;
+  color: #202124;
 }
 
-.store-rating .rating-count {
-  color: #6b7280;
+.card-rating .rating-count {
+  color: #70757a;
+}
+
+/* Address */
+.card-address {
+  font-size: 14px;
+  color: #5f6368;
+  line-height: 1.5;
+  font-style: normal;
+}
+
+/* Phone */
+.card-phone {
+  font-size: 14px;
+  color: #5f6368;
+}
+
+.card-phone a {
+  color: #5f6368;
+  text-decoration: none;
+}
+
+.card-phone a:hover {
+  text-decoration: underline;
+}
+
+/* Service Tags */
+.card-services {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.card-service-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  background: #f1f3f4;
+  border-radius: 4px;
   font-size: 13px;
+  color: #5f6368;
+  font-weight: 400;
+}
+
+/* Hours Text */
+.card-hours {
+  font-size: 14px;
+  color: #5f6368;
+  line-height: 1.5;
 }
 
 /* Contact Info Container - Groups Address + Phone */
@@ -853,95 +908,60 @@
 }
 
 /* ============================================
-   STORE ACTIONS - ENHANCED BUTTONS
+   STORE ACTIONS - SIMPLE CLEAN BUTTONS
    ============================================ */
 
-/* Store Actions - Compact Button Row */
-.store-actions {
+/* Card Actions */
+.card-actions {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   margin-top: 8px;
-  padding-top: 0;
-  flex-wrap: wrap;
-  align-items: stretch;
 }
 
-/* Beautiful Button Base - Compact */
-.btn-directions,
-.btn-set-store {
-  flex: 1;
-  min-height: 40px;
-  padding: 0 18px;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  text-align: center;
-  text-decoration: none;
+.card-action-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  white-space: nowrap;
-  letter-spacing: 0.3px;
-}
-
-/* Primary Button - Get Directions (Filled with Gradient) */
-.btn-directions {
-  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-  color: #fff !important;
-  border: none;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 15%);
-}
-
-.btn-directions:hover {
-  background: linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%);
-  box-shadow: 0 4px 12px rgb(0 0 0 / 25%);
-  transform: translateY(-2px);
-  color: #fff !important;
-}
-
-.btn-directions:active {
-  transform: translateY(0);
-  box-shadow: 0 1px 4px rgb(0 0 0 / 20%);
-  color: #fff !important;
-}
-
-.btn-directions:visited {
-  color: #fff !important;
-}
-
-/* Secondary Button - Set as My Store (Outlined) */
-.btn-set-store {
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  flex: 1;
   background: #fff;
-  color: #1a1a1a;
-  border: 2px solid #1a1a1a;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
+  color: #202124;
+  border: 1px solid #dadce0;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
 }
 
-/* Disabled State - My Store Selected (must come before :hover for specificity) */
-.btn-set-store:disabled {
-  cursor: not-allowed;
-  background: #ecfdf5;
-  color: #065f46;
-  border-color: #10b981;
-  border-width: 2px;
+.card-action-btn svg {
+  flex-shrink: 0;
+}
+
+/* Hover state for all buttons */
+.card-action-btn:hover:not(:disabled) {
+  background: #f8f9fa;
+  border-color: #bdc1c6;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
+}
+
+/* Selected state for My Store button */
+.btn-set-store:disabled,
+.btn-set-store.selected {
+  cursor: default;
+  background: #e8f5e9;
+  color: #1e7e34;
+  border-color: #4caf50;
   box-shadow: none;
-  transform: none;
 }
 
-.btn-set-store:hover:not(:disabled) {
-  background: #1a1a1a;
-  color: #fff;
-  border-color: #1a1a1a;
-  box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
-  transform: translateY(-2px);
-}
-
-.btn-set-store:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: 0 1px 4px rgb(0 0 0 / 10%);
+.btn-set-store:disabled:hover,
+.btn-set-store.selected:hover {
+  background: #e8f5e9;
+  box-shadow: none;
 }
 
 /* Map Container - Clean and linear */
@@ -1866,19 +1886,21 @@
   }
 
   .store-card {
-    padding: var(--spacing-medium);
     width: 100%; /* Ensure card doesn't overflow */
     box-sizing: border-box; /* Include padding in width calculation */
   }
 
-  .store-card-header {
-    flex-direction: column;
-    gap: var(--spacing-xsmall);
-    align-items: flex-start;
+  .store-name {
+    font-size: 17px;
   }
 
-  .store-name {
-    font-size: 18px;
+  .card-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .card-action-btn {
+    width: 100%;
   }
 
   .my-store-hero {
@@ -1914,31 +1936,11 @@
     box-sizing: border-box; /* Include padding in width */
   }
 
-  .store-photo {
-    width: calc(100% + calc(var(--spacing-small) * 2));
-    height: 150px;
-    margin: calc(var(--spacing-small) * -1) calc(var(--spacing-small) * -1) var(--spacing-xsmall);
-  }
-
   .store-status {
     align-self: flex-start;
   }
 
-  .store-actions {
-    flex-direction: column;
-    gap: var(--spacing-xsmall);
-    margin: 0 calc(var(--spacing-medium) * -1); /* Negative margin to extend to card edges */
-    padding: var(--spacing-small) var(--spacing-medium); /* Restore padding */
-    margin-top: var(--spacing-small);
-  }
-
-  .btn-directions,
-  .btn-set-store {
-    width: 100%;
-    box-sizing: border-box; /* Include padding in width */
-    padding: 0 var(--spacing-small); /* Reduce padding on mobile */
-    font-size: 13px; /* Slightly smaller font */
-  }
+  /* Old button styles kept for compatibility with any remaining references */
 
   .store-map {
     height: 350px;
@@ -2281,12 +2283,18 @@
     font-size: 11px;
   }
 
-  .store-card {
-    padding: var(--spacing-small);
-  }
-
   .store-name {
     font-size: 16px;
+    margin: 12px 0 6px;
+  }
+
+  .card-actions {
+    padding: 8px 12px 12px;
+  }
+
+  .card-action-btn {
+    font-size: 13px;
+    padding: 8px 12px;
   }
 
   .my-store-hero {
