@@ -162,15 +162,23 @@ function calculateDistance(lat1, lng1, lat2, lng2) {
 async function getUserLocation() {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
+      console.warn('❌ Geolocation not supported by browser');
       reject(new Error('Geolocation not supported'));
       return;
     }
+    console.log('🌍 Requesting user location...');
     navigator.geolocation.getCurrentPosition(
-      (position) => resolve({
-        lat: position.coords.latitude,
-        lng: position.coords.longitude,
-      }),
-      (error) => reject(error),
+      (position) => {
+        console.log('✅ User location obtained:', position.coords.latitude, position.coords.longitude);
+        resolve({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+      },
+      (error) => {
+        console.warn('❌ User location denied or unavailable:', error.message);
+        reject(error);
+      },
       { timeout: 10000, enableHighAccuracy: true },
     );
   });
@@ -660,53 +668,61 @@ function getTodayHours(store) {
  * @param {boolean} showDistance - Whether to show distance
  * @returns {Element} Store card element
  */
-function renderStoreCard(store, showDistance = true) {
+function renderStoreCard(store) {
   const card = document.createElement('article');
   card.classList.add('store-card');
   card.dataset.storeId = store.id;
 
-  const isOpen = isStoreOpen(store);
-
-  // Store photo (if available)
-  if (store.photo) {
-    const photo = document.createElement('img');
-    photo.classList.add('store-photo');
-    photo.src = store.photo;
-    photo.alt = `${store.name} storefront`;
-    photo.loading = 'lazy';
-    card.appendChild(photo);
+  // Mark featured stores
+  if (store.featured) {
+    card.dataset.featured = 'true';
   }
 
-  // Header with name and status
+  const isOpen = isStoreOpen(store);
+
+  // Diagnostic logging for missing data
+  console.log(`🔍 Rendering card for: ${store.name}`);
+  console.log('  📍 Distance:', store.distance !== undefined ? `${store.distance.toFixed(1)} miles` : '❌ NOT CALCULATED (no user location)');
+  console.log('  📞 Phone:', store.contact?.phone || '❌ NOT AVAILABLE FROM GOOGLE');
+  console.log('  🕒 Hours:', store.hours && Object.keys(store.hours).length > 0 ? '✅ Available' : '❌ NOT AVAILABLE FROM GOOGLE');
+
+  // Header with name, status, and distance
   const header = document.createElement('div');
   header.classList.add('store-card-header');
-
-  const nameContainer = document.createElement('div');
-  nameContainer.classList.add('store-name-container');
 
   const name = document.createElement('h3');
   name.classList.add('store-name');
   name.textContent = store.name;
-  nameContainer.appendChild(name);
+  header.appendChild(name);
 
-  // Star rating (from Google Places API)
-  if (store.rating && store.userRatingsTotal) {
-    const rating = document.createElement('div');
-    rating.classList.add('store-rating');
-    const stars = '★'.repeat(Math.round(store.rating)) + '☆'.repeat(5 - Math.round(store.rating));
-    rating.innerHTML = `<span class="stars">${stars}</span> <span class="rating-value">${store.rating}</span> <span class="rating-count">(${store.userRatingsTotal})</span>`;
-    nameContainer.appendChild(rating);
-  }
+  const metaRow = document.createElement('div');
+  metaRow.classList.add('store-meta-row');
 
-  header.appendChild(nameContainer);
-
-  // Status badge in top right
+  // Status badge
   const statusBadge = document.createElement('span');
   statusBadge.classList.add('store-status-badge', isOpen ? 'open' : 'closed');
   statusBadge.innerHTML = isOpen ? '● OPEN' : '○ CLOSED';
-  header.appendChild(statusBadge);
+  metaRow.appendChild(statusBadge);
 
+  // Distance (if available)
+  if (store.distance !== undefined) {
+    const distance = document.createElement('span');
+    distance.classList.add('store-distance-badge');
+    distance.innerHTML = `📍 ${store.distance.toFixed(1)} miles away`;
+    metaRow.appendChild(distance);
+  }
+
+  header.appendChild(metaRow);
   card.appendChild(header);
+
+  // Star rating row (from Google Places API)
+  if (store.rating && store.userRatingsTotal) {
+    const ratingRow = document.createElement('div');
+    ratingRow.classList.add('store-rating');
+    const stars = '★'.repeat(Math.round(store.rating)) + '☆'.repeat(5 - Math.round(store.rating));
+    ratingRow.innerHTML = `<span class="stars">${stars}</span> <span class="rating-value">${store.rating}</span> <span class="rating-count">(${store.userRatingsTotal})</span>`;
+    card.appendChild(ratingRow);
+  }
 
   // Address (from Google Places API formatted_address)
   const address = document.createElement('address');
@@ -714,7 +730,7 @@ function renderStoreCard(store, showDistance = true) {
   address.textContent = `${store.address.street}, ${store.address.city}, ${store.address.state} ${store.address.zip}`;
   card.appendChild(address);
 
-  // Phone (from Google Places API formatted_phone_number)
+  // Phone number (from Google Places API)
   if (store.contact.phone) {
     const phone = document.createElement('div');
     phone.classList.add('store-phone');
@@ -722,11 +738,11 @@ function renderStoreCard(store, showDistance = true) {
     card.appendChild(phone);
   }
 
-  // Services
+  // Service tags/badges (from DA.live custom services)
   if (store.services && store.services.length > 0) {
     const services = document.createElement('div');
     services.classList.add('store-services');
-    store.services.forEach((service) => {
+    store.services.slice(0, 3).forEach((service) => {
       const badge = document.createElement('span');
       badge.classList.add('service-badge');
       badge.textContent = service;
@@ -735,31 +751,13 @@ function renderStoreCard(store, showDistance = true) {
     card.appendChild(services);
   }
 
-  // Store details (parking, accessibility, features)
-  if (store.details && store.details.length > 0) {
-    const details = document.createElement('div');
-    details.classList.add('store-details');
-    store.details.forEach((detail) => {
-      const detailItem = document.createElement('span');
-      detailItem.classList.add('detail-item');
-      detailItem.textContent = detail;
-      details.appendChild(detailItem);
-    });
-    card.appendChild(details);
-  }
-
-  // Today's hours (from Google Places API opening_hours)
-  const hoursToday = document.createElement('div');
-  hoursToday.classList.add('store-hours-today');
-  hoursToday.textContent = getTodayHours(store);
-  card.appendChild(hoursToday);
-
-  // Distance with icon (if available)
-  if (showDistance && store.distance !== undefined) {
-    const distanceDiv = document.createElement('div');
-    distanceDiv.classList.add('store-distance');
-    distanceDiv.innerHTML = `<span class="distance-icon">📍</span> ${store.distance.toFixed(1)} miles away`;
-    card.appendChild(distanceDiv);
+  // Today's hours (from Google Places API)
+  const hoursText = getTodayHours(store);
+  if (hoursText && hoursText !== 'Hours not available') {
+    const hours = document.createElement('div');
+    hours.classList.add('store-hours');
+    hours.textContent = hoursText;
+    card.appendChild(hours);
   }
 
   // Actions
@@ -768,10 +766,14 @@ function renderStoreCard(store, showDistance = true) {
 
   const directionsBtn = document.createElement('a');
   directionsBtn.classList.add('btn-directions');
-  directionsBtn.href = `https://maps.google.com/?q=${store.address.coordinates.lat},${store.address.coordinates.lng}`;
+  // Use Place ID if available for rich place info, otherwise fall back to coordinates
+  if (store.placeId) {
+    directionsBtn.href = `https://www.google.com/maps/place/?q=place_id:${store.placeId}`;
+  } else {
+    directionsBtn.href = `https://maps.google.com/?q=${store.address.coordinates.lat},${store.address.coordinates.lng}`;
+  }
   directionsBtn.target = '_blank';
   directionsBtn.rel = 'noopener noreferrer';
-  directionsBtn.innerHTML = '<span class="btn-icon">📍</span> Get Directions';
   directionsBtn.innerHTML = '📍 Get Directions';
 
   const setStoreBtn = document.createElement('button');
@@ -1514,8 +1516,48 @@ async function initializeMap(container, stores, center, zoomLevel) {
  * @param {Object} store - Store object with Place ID
  * @returns {Promise<Object>} Enriched store object
  */
+/**
+ * Convert Google's regularOpeningHours to our simplified hours format
+ * @param {Object} regularOpeningHours - Google's opening hours object
+ * @returns {Object} Simplified hours object {monday: {open: '09:00', close: '17:00'}, ...}
+ */
+function parseGoogleOpeningHours(regularOpeningHours) {
+  if (!regularOpeningHours || !regularOpeningHours.periods) {
+    return {};
+  }
+
+  const hours = {};
+  const dayMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+  regularOpeningHours.periods.forEach((period) => {
+    if (period.open && period.close) {
+      const dayName = dayMap[period.open.day];
+      hours[dayName] = {
+        open: `${period.open.hour.toString().padStart(2, '0')}:${period.open.minute.toString().padStart(2, '0')}`,
+        close: `${period.close.hour.toString().padStart(2, '0')}:${period.close.minute.toString().padStart(2, '0')}`,
+      };
+    } else if (period.open && !period.close) {
+      // 24-hour day
+      const dayName = dayMap[period.open.day];
+      hours[dayName] = {
+        open: '00:00',
+        close: '23:59',
+      };
+    }
+  });
+
+  return hours;
+}
+
 async function enrichStoreWithPlacesData(store) {
   if (!store.placeId) {
+    console.warn(`⚠️ Store ${store.name || store.id} has no Place ID`);
+    return store;
+  }
+
+  // Check if Places API is available
+  if (!window.google?.maps?.places?.Place) {
+    console.error('❌ Google Places API (New) not loaded! Cannot enrich stores.');
     return store;
   }
 
@@ -1552,6 +1594,9 @@ async function enrichStoreWithPlacesData(store) {
       const state = stateZipParts[0] || '';
       const zip = stateZipParts[1] || '';
 
+      // Parse Google's opening hours to our format
+      const parsedHours = parseGoogleOpeningHours(place.regularOpeningHours);
+
       // Filter out generic Google Places types (keep only meaningful ones)
       const excludedTypes = [
         'establishment',
@@ -1583,7 +1628,9 @@ async function enrichStoreWithPlacesData(store) {
           email: '',
           website: place.websiteURI || '',
         },
-        hours: place.regularOpeningHours || {},
+        hours: parsedHours,
+        // Keep raw Google data for advanced features
+        regularOpeningHours: place.regularOpeningHours,
         // Use custom services only (ignore generic Google types)
         services: store.customServices.length > 0
           ? store.customServices
@@ -1598,12 +1645,18 @@ async function enrichStoreWithPlacesData(store) {
       };
 
       console.log(`✅ Enriched store: ${enrichedStore.name} (NEW Places API)`);
+      console.log('  📍 Address:', enrichedStore.address);
+      console.log('  📞 Phone:', enrichedStore.contact.phone || '❌ NOT PROVIDED BY GOOGLE');
+      console.log('  🕒 Hours:', Object.keys(parsedHours).length > 0 ? `✅ ${Object.keys(parsedHours).length} days` : '❌ NOT PROVIDED BY GOOGLE');
+      console.log('  ⭐ Rating:', enrichedStore.rating || '❌ NOT PROVIDED BY GOOGLE');
+      console.log('  📊 Reviews:', enrichedStore.userRatingsTotal || '❌ NOT PROVIDED BY GOOGLE');
       return enrichedStore;
     }
     console.warn(`⚠️ Could not enrich store with Place ID ${store.placeId}: No data returned`);
     return store;
   } catch (error) {
     console.error(`❌ Error enriching store with Place ID ${store.placeId}:`, error);
+    console.error('   Error details:', error.message);
     return store; // Return original store if enrichment fails
   }
 }
@@ -1621,6 +1674,14 @@ async function enrichStoresWithPlacesData(stores) {
     return stores;
   }
 
+  // Safety check: Ensure Places API is loaded
+  if (!window.google?.maps?.places?.Place) {
+    console.error('❌ CRITICAL: Google Places API (New) not loaded!');
+    console.error('   Cannot enrich stores with Place IDs.');
+    console.error('   Stores will show with placeholder data only.');
+    return stores; // Return un-enriched stores
+  }
+
   console.log(`🔄 Enriching ${storesToEnrich.length} stores with NEW Places API...`);
 
   const enrichedStores = await Promise.all(
@@ -1632,7 +1693,8 @@ async function enrichStoresWithPlacesData(stores) {
     }),
   );
 
-  console.log('✅ All stores enriched with NEW Places API');
+  const successfulEnrichments = enrichedStores.filter((s) => !s.requiresEnrichment).length;
+  console.log(`✅ Successfully enriched ${successfulEnrichments}/${storesToEnrich.length} stores with NEW Places API`);
   return enrichedStores;
 }
 
