@@ -249,9 +249,14 @@ Each row in DA.live represents one store with 8 columns:
 
 **See [DA-LIVE-GUIDE.md](./DA-LIVE-GUIDE.md) for worldwide examples and complete authoring instructions.**
 
-### stores-data.js Format (Legacy)
+### Legacy stores-data.js (Removed)
+
+**Note:** Static `stores-data.js` has been removed. All store data should come from DA.live tables using Place IDs and Google Places API enrichment.
+
+For reference, the old format was:
 
 ```javascript
+// LEGACY - DO NOT USE
 export const storesData = {
   stores: [
     {
@@ -317,8 +322,8 @@ export const storesData = {
 ## Technical Details
 
 ### Dependencies
-- `stores-data.js` - Static store data
-- Google Maps API (optional, for map display)
+- Google Maps API (required for map display and Places API enrichment)
+- **Places API (New)** - Must be enabled in Google Cloud Console
 - Nominatim API (for geocoding fallback)
 
 ### Core Functions
@@ -565,9 +570,10 @@ If Google Maps is unavailable:
 - Verify fallback location is set
 
 ### No Stores Showing
-- Check `stores-data.js` is properly formatted
-- Verify coordinates are valid (lat: -90 to 90, lng: -180 to 180)
-- Confirm data source setting matches file location
+- Check DA.live table has valid Place IDs in the "Places ID" column
+- Verify "Places API (New)" is enabled in Google Cloud Console
+- Check console for enrichment errors
+- Confirm data source is set to "block-content" (default)
 - Check browser console for loading errors
 
 ### Distance Not Calculating

@@ -1,5 +1,5 @@
 /* eslint-disable no-console, no-undef */
-import { storesData } from './stores-data.js';
+/* Store Locator v2.0 - NEW Places API & Advanced Markers - Pure Implementation */
 
 /**
  * Parse block configuration from DA.live table rows
@@ -94,18 +94,29 @@ async function loadGoogleMaps(apiKey) {
     return false;
   }
 
-  return new Promise((resolve, reject) => {
-    console.log('📍 Loading Google Maps API with Places library...');
+  console.log('📍 Loading Google Maps API (NEW - requires "Places API (New)" enabled)...');
 
+  return new Promise((resolve, reject) => {
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    // Load the NEWEST Google Maps API with callback to ensure full initialization
+    window.initGoogleMapsCallback = async () => {
+      try {
+        // Dynamically import libraries using the NEW importLibrary method
+        await google.maps.importLibrary('places');
+        await google.maps.importLibrary('marker');
+        console.log('✅ Google Maps API loaded with NEW Places & Marker libraries');
+        console.log(`   Version: ${google.maps.version}`);
+        resolve(true);
+      } catch (error) {
+        console.error('❌ Failed to load Google Maps libraries:', error);
+        console.error('💡 Make sure "Places API (New)" is enabled in Google Cloud Console');
+        reject(error);
+      }
+    };
+
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=beta&callback=initGoogleMapsCallback`;
     script.async = true;
     script.defer = true;
-
-    script.onload = () => {
-      console.log('✅ Google Maps API loaded successfully (with Places)');
-      resolve(true);
-    };
 
     script.onerror = () => {
       console.error('❌ Failed to load Google Maps API');
@@ -261,7 +272,43 @@ function parseStoresFromBlock(block) {
   const stores = [];
   let skippedCount = 0;
 
-  // Skip first row (column headers only):
+  // Find the data section (skip configuration rows)
+  // Look for a row that starts with "Places ID" or "Name" (data headers)
+  let dataStartIndex = -1;
+  for (let i = 0; i < rows.length; i += 1) {
+    const cells = [...rows[i].children];
+    const firstCell = cells[0]?.textContent?.trim() || '';
+
+    // Check if this row looks like a data table header
+    if (firstCell.toLowerCase().includes('place')
+        || firstCell.toLowerCase() === 'name') {
+      dataStartIndex = i;
+      console.log(`🔍 Found data section at row ${i}, header: "${firstCell}"`);
+      break;
+    }
+  }
+
+  if (dataStartIndex === -1) {
+    console.error('❌ No data table found in block!');
+    return { stores: [] };
+  }
+
+  // Get the header row
+  const headerRow = rows[dataStartIndex];
+  const headerCells = [...headerRow.children];
+  const firstHeader = headerCells[0]?.textContent?.trim() || '';
+
+  // If header contains "Place" or "Places ID", use Place ID format
+  const isPlaceIdFormat = firstHeader.toLowerCase().includes('place');
+
+  if (isPlaceIdFormat) {
+    console.log('📍 Detected Place ID format (DA.live with Google Places)');
+    return parseStoresFromPlaceIds(block, dataStartIndex);
+  }
+
+  console.log('📍 Detected legacy format (Name, Address, Coordinates...)');
+
+  // Legacy format parsing:
   // Row 0 = column headers
   // (Name | Address | Coordinates | Phone | Hours | Services | Photo | Details)
   // Row 1+ = actual store data
@@ -359,6 +406,84 @@ function parseStoresFromBlock(block) {
 }
 
 /**
+ * Parse stores from DA.live table with Place IDs
+ * Table format: Places ID | Featured | Custom Services | Display Order | Override Name
+ * @param {Element} block - The block element containing the table
+ * @param {number} startIndex - Index of the header row (data starts at startIndex + 1)
+ * @returns {Object} Object with stores array
+ */
+function parseStoresFromPlaceIds(block, startIndex = 0) {
+  const rows = [...block.children];
+  const stores = [];
+  let skippedCount = 0;
+
+  // Skip header row (data starts at startIndex + 1)
+  rows.slice(startIndex + 1).forEach((row, index) => {
+    const cells = [...row.children];
+
+    // Need at least 1 column (Place ID)
+    if (cells.length < 1) {
+      skippedCount += 1;
+      return;
+    }
+
+    const placeId = cells[0]?.textContent?.trim();
+    const featured = cells[1]?.textContent?.trim().toLowerCase() === 'true';
+    const customServicesText = cells[2]?.textContent?.trim() || '';
+    const displayOrder = cells[3]?.textContent?.trim() || '';
+    const overrideName = cells[4]?.textContent?.trim() || '';
+
+    // Skip if no Place ID
+    if (!placeId) {
+      skippedCount += 1;
+      return;
+    }
+
+    // Parse custom services (comma-separated)
+    const customServices = customServicesText
+      ? customServicesText.split(',').map((s) => s.trim().toLowerCase()).filter((s) => s)
+      : [];
+
+    // Create store object with Place ID (will be enriched later)
+    const store = {
+      id: placeId, // Use Place ID as store ID
+      placeId, // Google Places ID
+      name: overrideName || 'Loading...', // Placeholder, will be replaced by Places API
+      featured,
+      customServices,
+      displayOrder: displayOrder ? parseInt(displayOrder, 10) : index,
+      overrideName,
+      requiresEnrichment: true, // Flag to indicate Places API enrichment needed
+      // Minimal structure - will be filled by Places API
+      address: {
+        street: '',
+        city: '',
+        state: '',
+        zip: '',
+        coordinates: { lat: 0, lng: 0 },
+      },
+      contact: {
+        phone: '',
+        email: '',
+      },
+      hours: {},
+      services: customServices, // Start with custom services
+      photo: '',
+      details: [],
+      specialHours: [],
+    };
+
+    stores.push(store);
+  });
+
+  // Summary log
+  const skipMsg = skippedCount > 0 ? `, ${skippedCount} incomplete rows skipped` : '';
+  console.log(`✅ Store Locator: ${stores.length} stores loaded from Place IDs${skipMsg}`);
+
+  return { stores };
+}
+
+/**
  * Load store data from configured source
  * @param {Object} config - Block configuration
  * @param {Element} block - Block element for parsing rows
@@ -370,9 +495,6 @@ async function loadStoreData(config, block) {
   if (config.dataSource === 'block-content') {
     return parseStoresFromBlock(block);
   }
-  if (config.dataSource === 'embedded') {
-    return storesData;
-  }
   if (config.dataSource === 'json-file') {
     const response = await fetch('/data/stores.json');
     return response.json();
@@ -381,7 +503,8 @@ async function loadStoreData(config, block) {
     const response = await fetch('/api/stores');
     return response.json();
   }
-  return storesData;
+  // Default to parsing from block content (DA.live table)
+  return parseStoresFromBlock(block);
 }
 
 /**
@@ -558,44 +681,46 @@ function renderStoreCard(store, showDistance = true) {
   const header = document.createElement('div');
   header.classList.add('store-card-header');
 
+  const nameContainer = document.createElement('div');
+  nameContainer.classList.add('store-name-container');
+
   const name = document.createElement('h3');
   name.classList.add('store-name');
   name.textContent = store.name;
+  nameContainer.appendChild(name);
 
-  const status = document.createElement('span');
-  status.classList.add('store-status', isOpen ? 'open' : 'closed');
-  status.innerHTML = isOpen ? '● Open' : '○ Closed';
-
-  header.appendChild(name);
-  header.appendChild(status);
-  card.appendChild(header);
-
-  // Address
-  const address = document.createElement('address');
-  address.classList.add('store-address');
-  address.innerHTML = `
-    ${store.address.street}<br>
-    ${store.address.city}, ${store.address.state} ${store.address.zip}
-  `;
-  card.appendChild(address);
-
-  // Distance (if available)
-  if (showDistance && store.distance !== undefined) {
-    const distance = document.createElement('div');
-    distance.classList.add('store-distance');
-    distance.innerHTML = `📍 ${store.distance.toFixed(1)} miles away`;
-    card.appendChild(distance);
+  // Star rating (from Google Places API)
+  if (store.rating && store.userRatingsTotal) {
+    const rating = document.createElement('div');
+    rating.classList.add('store-rating');
+    const stars = '★'.repeat(Math.round(store.rating)) + '☆'.repeat(5 - Math.round(store.rating));
+    rating.innerHTML = `<span class="stars">${stars}</span> <span class="rating-value">${store.rating}</span> <span class="rating-count">(${store.userRatingsTotal})</span>`;
+    nameContainer.appendChild(rating);
   }
 
-  // Contact
-  const contact = document.createElement('div');
-  contact.classList.add('store-contact');
-  contact.innerHTML = `
-    <a href="tel:${store.contact.phone.replace(/\D/g, '')}" class="store-phone">
-      ${store.contact.phone}
-    </a>
-  `;
-  card.appendChild(contact);
+  header.appendChild(nameContainer);
+
+  // Status badge in top right
+  const statusBadge = document.createElement('span');
+  statusBadge.classList.add('store-status-badge', isOpen ? 'open' : 'closed');
+  statusBadge.innerHTML = isOpen ? '● OPEN' : '○ CLOSED';
+  header.appendChild(statusBadge);
+
+  card.appendChild(header);
+
+  // Address (from Google Places API formatted_address)
+  const address = document.createElement('address');
+  address.classList.add('store-address');
+  address.textContent = `${store.address.street}, ${store.address.city}, ${store.address.state} ${store.address.zip}`;
+  card.appendChild(address);
+
+  // Phone (from Google Places API formatted_phone_number)
+  if (store.contact.phone) {
+    const phone = document.createElement('div');
+    phone.classList.add('store-phone');
+    phone.innerHTML = `<a href="tel:${store.contact.phone.replace(/\D/g, '')}">${store.contact.phone}</a>`;
+    card.appendChild(phone);
+  }
 
   // Services
   if (store.services && store.services.length > 0) {
@@ -623,11 +748,19 @@ function renderStoreCard(store, showDistance = true) {
     card.appendChild(details);
   }
 
-  // Today's hours
+  // Today's hours (from Google Places API opening_hours)
   const hoursToday = document.createElement('div');
   hoursToday.classList.add('store-hours-today');
   hoursToday.textContent = getTodayHours(store);
   card.appendChild(hoursToday);
+
+  // Distance with icon (if available)
+  if (showDistance && store.distance !== undefined) {
+    const distanceDiv = document.createElement('div');
+    distanceDiv.classList.add('store-distance');
+    distanceDiv.innerHTML = `<span class="distance-icon">📍</span> ${store.distance.toFixed(1)} miles away`;
+    card.appendChild(distanceDiv);
+  }
 
   // Actions
   const actions = document.createElement('div');
@@ -638,6 +771,7 @@ function renderStoreCard(store, showDistance = true) {
   directionsBtn.href = `https://maps.google.com/?q=${store.address.coordinates.lat},${store.address.coordinates.lng}`;
   directionsBtn.target = '_blank';
   directionsBtn.rel = 'noopener noreferrer';
+  directionsBtn.innerHTML = '<span class="btn-icon">📍</span> Get Directions';
   directionsBtn.innerHTML = '📍 Get Directions';
 
   const setStoreBtn = document.createElement('button');
@@ -1284,14 +1418,14 @@ function createSearchSection(config, availableServices, onSearch, onSortChange) 
 }
 
 /**
- * Initialize Google Maps (if available)
+ * Initialize Google Maps with NEW Advanced Markers (replaces deprecated Marker)
  * @param {Element} container - Map container element
  * @param {Array} stores - Array of stores to display
  * @param {Object} center - Center coordinates {lat, lng}
  * @param {number} zoomLevel - Map zoom level
- * @returns {Object|null} Map instance or null
+ * @returns {Promise<Object|null>} Map instance or null
  */
-function initializeMap(container, stores, center, zoomLevel) {
+async function initializeMap(container, stores, center, zoomLevel) {
   // Check if Google Maps is available
   if (typeof google === 'undefined' || !google.maps) {
     container.innerHTML = '<p class="map-placeholder">📍 Map requires Google Maps API key.<br><br>Add <strong>"Google Maps API Key"</strong> in your DA.live block configuration to enable the interactive map.<br><br>The store list and search features work without it!</p>';
@@ -1299,38 +1433,50 @@ function initializeMap(container, stores, center, zoomLevel) {
   }
 
   try {
+    // Import the NEW marker library using importLibrary (pure new approach)
+    const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary('marker');
+
     const map = new google.maps.Map(container, {
       center: { lat: center.lat, lng: center.lng },
       zoom: zoomLevel,
       mapTypeControl: false,
       streetViewControl: false,
+      mapId: 'STORE_LOCATOR_MAP', // Required for Advanced Markers
     });
 
-    // Add user location marker
+    // Add user location marker using NEW AdvancedMarkerElement
+    const userPin = new PinElement({
+      scale: 1.2,
+      background: '#4285F4',
+      borderColor: '#ffffff',
+      glyphColor: '#ffffff',
+    });
+
     // eslint-disable-next-line no-new
-    new google.maps.Marker({
-      position: { lat: center.lat, lng: center.lng },
+    new AdvancedMarkerElement({
       map,
+      position: { lat: center.lat, lng: center.lng },
       title: 'Your Location',
-      icon: {
-        path: google.maps.SymbolPath.CIRCLE,
-        scale: 8,
-        fillColor: '#4285F4',
-        fillOpacity: 1,
-        strokeColor: '#ffffff',
-        strokeWeight: 2,
-      },
+      content: userPin.element,
     });
 
-    // Add markers for each store
+    // Add NEW Advanced Markers for each store
     stores.forEach((store) => {
-      const marker = new google.maps.Marker({
+      const storePin = new PinElement({
+        scale: 1.0,
+        background: '#EA4335',
+        borderColor: '#ffffff',
+        glyphColor: '#ffffff',
+      });
+
+      const marker = new AdvancedMarkerElement({
+        map,
         position: {
           lat: store.address.coordinates.lat,
           lng: store.address.coordinates.lng,
         },
-        map,
         title: store.name,
+        content: storePin.element,
       });
 
       const infoWindow = new google.maps.InfoWindow({
@@ -1354,12 +1500,140 @@ function initializeMap(container, stores, center, zoomLevel) {
       });
     });
 
+    console.log('✅ Map initialized with NEW Advanced Markers');
     return map;
   } catch (error) {
     console.error('Map initialization error:', error);
     container.innerHTML = '<p class="map-error">Unable to load map. Please try again later.</p>';
     return null;
   }
+}
+
+/**
+ * Enrich a store with Google Places API data using NEW Place class
+ * @param {Object} store - Store object with Place ID
+ * @returns {Promise<Object>} Enriched store object
+ */
+async function enrichStoreWithPlacesData(store) {
+  if (!store.placeId) {
+    return store;
+  }
+
+  try {
+    // Use the NEW Place class (Places API New)
+    const place = new google.maps.places.Place({
+      id: store.placeId,
+    });
+
+    // Fetch fields using the new fetchFields method with field mask
+    await place.fetchFields({
+      fields: [
+        'displayName',
+        'formattedAddress',
+        'location',
+        'nationalPhoneNumber',
+        'websiteURI',
+        'regularOpeningHours',
+        'rating',
+        'userRatingCount',
+        'photos',
+        'types',
+      ],
+    });
+
+    // Extract data from the new Place object
+    if (place && place.displayName) {
+      // Parse address from formattedAddress
+      const addressParts = (place.formattedAddress || '').split(',').map((p) => p.trim());
+      const street = addressParts[0] || '';
+      const city = addressParts[1] || '';
+      const stateZip = addressParts[2] || '';
+      const stateZipParts = stateZip.split(' ');
+      const state = stateZipParts[0] || '';
+      const zip = stateZipParts[1] || '';
+
+      // Filter out generic Google Places types (keep only meaningful ones)
+      const excludedTypes = [
+        'establishment',
+        'point_of_interest',
+        'finance',
+        'store',
+        'general_contractor',
+      ];
+      const meaningfulTypes = (place.types || [])
+        .filter((type) => !excludedTypes.includes(type))
+        .map((type) => type.replace(/_/g, ' ')); // Convert snake_case to readable
+
+      // Merge Places API data with store data
+      const enrichedStore = {
+        ...store,
+        name: store.overrideName || place.displayName,
+        address: {
+          street,
+          city,
+          state,
+          zip,
+          coordinates: {
+            lat: place.location.lat(),
+            lng: place.location.lng(),
+          },
+        },
+        contact: {
+          phone: place.nationalPhoneNumber || '',
+          email: '',
+          website: place.websiteURI || '',
+        },
+        hours: place.regularOpeningHours || {},
+        // Use custom services only (ignore generic Google types)
+        services: store.customServices.length > 0
+          ? store.customServices
+          : meaningfulTypes,
+        photo: place.photos && place.photos[0]
+          ? place.photos[0].getURI({ maxHeight: 200 })
+          : '',
+        rating: place.rating || 0,
+        userRatingsTotal: place.userRatingCount || 0,
+        placeData: place, // Keep full Places API data
+        requiresEnrichment: false,
+      };
+
+      console.log(`✅ Enriched store: ${enrichedStore.name} (NEW Places API)`);
+      return enrichedStore;
+    }
+    console.warn(`⚠️ Could not enrich store with Place ID ${store.placeId}: No data returned`);
+    return store;
+  } catch (error) {
+    console.error(`❌ Error enriching store with Place ID ${store.placeId}:`, error);
+    return store; // Return original store if enrichment fails
+  }
+}
+
+/**
+ * Enrich all stores that need Places API data using NEW Place class
+ * @param {Array} stores - Array of store objects
+ * @returns {Promise<Array>} Array of enriched stores
+ */
+async function enrichStoresWithPlacesData(stores) {
+  const storesToEnrich = stores.filter((store) => store.requiresEnrichment);
+
+  if (storesToEnrich.length === 0) {
+    console.log('No stores require Places API enrichment');
+    return stores;
+  }
+
+  console.log(`🔄 Enriching ${storesToEnrich.length} stores with NEW Places API...`);
+
+  const enrichedStores = await Promise.all(
+    stores.map((store) => {
+      if (store.requiresEnrichment) {
+        return enrichStoreWithPlacesData(store);
+      }
+      return Promise.resolve(store);
+    }),
+  );
+
+  console.log('✅ All stores enriched with NEW Places API');
+  return enrichedStores;
 }
 
 /**
@@ -1408,12 +1682,11 @@ export default async function decorate(block) {
   }
 
   // State management
-  const allStores = storeDataObj.stores;
+  let allStores = storeDataObj.stores;
   let filteredStores = [];
   let userLocation = null;
   let mapInstance = null;
   let loadingSpinner; // Declared here, assigned later
-
   // Get available services from actual store data (for dynamic filters)
   const availableServices = getAvailableServices(allStores);
 
@@ -1691,10 +1964,26 @@ export default async function decorate(block) {
     if (config.googleMapsApiKey && config.mapProvider === 'google') {
       try {
         await loadGoogleMaps(config.googleMapsApiKey);
+
+        // Enrich stores that have Place IDs using NEW Places API
+        if (allStores.some((store) => store.requiresEnrichment)) {
+          showLoading(listContainer, loadingSpinner);
+          allStores = await enrichStoresWithPlacesData(allStores);
+          // Re-render the stores with enriched data (show all stores initially)
+          filteredStores = allStores.slice(0, config.maxResults);
+          renderStores(filteredStores);
+          hideLoading(loadingSpinner);
+        }
+
         const fallback = { lat: 45.5231, lng: -122.6765 };
         const mapCenter = userLocation
           || filteredStores[0]?.address.coordinates || fallback;
-        mapInstance = initializeMap(mapContainer, filteredStores, mapCenter, config.zoomLevel);
+        mapInstance = await initializeMap(
+          mapContainer,
+          filteredStores,
+          mapCenter,
+          config.zoomLevel,
+        );
       } catch (error) {
         console.error('Failed to load Google Maps:', error);
         const errorMsg = 'Unable to load map. Please check your API key and try again.';
