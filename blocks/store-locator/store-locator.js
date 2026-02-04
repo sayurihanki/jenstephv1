@@ -609,11 +609,15 @@ function sortStoresByDistance(stores, userLat, userLng) {
  */
 function isStoreOpen(store) {
   const now = new Date();
-  const day = now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-  const currentTime = now.toTimeString().slice(0, 5); // "HH:MM"
+  const utcNow = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const storeTime = typeof store.utcOffsetMinutes === 'number'
+    ? new Date(utcNow + (store.utcOffsetMinutes * 60000))
+    : now;
+  const day = storeTime.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+  const currentTime = storeTime.toTimeString().slice(0, 5); // "HH:MM"
 
   // Check special hours first
-  const today = now.toISOString().slice(0, 10);
+  const today = storeTime.toISOString().slice(0, 10);
   const specialHour = store.specialHours?.find((sh) => sh.date === today);
   if (specialHour?.status === 'closed') return false;
 
@@ -645,7 +649,11 @@ function formatTime(time) {
  */
 function getTodayHours(store) {
   const now = new Date();
-  const day = now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+  const utcNow = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const storeTime = typeof store.utcOffsetMinutes === 'number'
+    ? new Date(utcNow + (store.utcOffsetMinutes * 60000))
+    : now;
+  const day = storeTime.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
   const hours = store.hours[day];
 
   if (!hours) return 'Hours not available';
@@ -1599,6 +1607,7 @@ async function enrichStoreWithPlacesData(store) {
         'nationalPhoneNumber',
         'websiteURI',
         'regularOpeningHours',
+        'utcOffsetMinutes',
         'rating',
         'userRatingCount',
         'photos',
@@ -1683,6 +1692,7 @@ async function enrichStoreWithPlacesData(store) {
         hours: parsedHours,
         // Keep raw Google data for advanced features
         regularOpeningHours: place.regularOpeningHours,
+        utcOffsetMinutes: place.utcOffsetMinutes,
         // Use custom services only (ignore generic Google types)
         services: store.customServices.length > 0
           ? store.customServices
