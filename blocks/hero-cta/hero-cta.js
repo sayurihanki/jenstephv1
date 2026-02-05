@@ -9,14 +9,17 @@ const DEFAULT_INTERVAL = 5000;
  */
 function getLuminance(hex) {
   const rgb = parseInt(hex.slice(1), 16);
+  // eslint-disable-next-line no-bitwise
   const r = ((rgb >> 16) & 0xff) / 255;
+  // eslint-disable-next-line no-bitwise
   const g = ((rgb >> 8) & 0xff) / 255;
+  // eslint-disable-next-line no-bitwise
   const b = (rgb & 0xff) / 255;
-  
-  const [rs, gs, bs] = [r, g, b].map((c) => {
-    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-  });
-  
+
+  const [rs, gs, bs] = [r, g, b].map((c) => (
+    c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  ));
+
   return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
 }
 
@@ -27,15 +30,15 @@ function getLuminance(hex) {
  */
 function validateContrast(bgColor, textColor = '#ffffff') {
   if (!bgColor.startsWith('#')) return;
-  
+
   const bgLum = getLuminance(bgColor);
   const textLum = getLuminance(textColor);
   const ratio = (Math.max(bgLum, textLum) + 0.05) / (Math.min(bgLum, textLum) + 0.05);
-  
+
   if (ratio < 4.5) {
     console.warn(
-      `hero-cta: Low contrast ratio ${ratio.toFixed(2)}:1 for ${bgColor}. ` +
-      `WCAG AA requires 4.5:1 minimum. Consider adjusting color.`
+      `hero-cta: Low contrast ratio ${ratio.toFixed(2)}:1 for ${bgColor}. `
+      + 'WCAG AA requires 4.5:1 minimum. Consider adjusting color.',
     );
   }
 }
@@ -67,12 +70,6 @@ function normalizeGradientIntensity(value, fallback) {
 function normalizeButtonStyle(value, fallback) {
   const val = (value || '').toLowerCase();
   if (['default', 'pill', 'sharp'].includes(val)) return val;
-  return fallback;
-}
-
-function normalizeImageQuality(value, fallback) {
-  const val = (value || '').toLowerCase();
-  if (['low', 'medium', 'high'].includes(val)) return val;
   return fallback;
 }
 
@@ -123,7 +120,7 @@ function extractImageSource(cell) {
   // Check for link to image (a[href])
   const link = cell.querySelector('a');
   if (link && link.href) {
-    const href = link.href;
+    const { href } = link;
     // Check if link points to an image file
     if (/\.(jpg|jpeg|png|gif|webp|svg)$/i.test(href)) {
       return { src: href, alt: link.textContent || '' };
@@ -157,9 +154,9 @@ function buildSlide(row, isFirstSlide = false, config = {}) {
       { media: '(min-width: 1920px)', width: Math.min(maxWidth, 2400).toString() },
       { media: '(min-width: 1200px)', width: Math.min(maxWidth, 2000).toString() },
       { media: '(min-width: 768px)', width: Math.min(maxWidth, 1500).toString() },
-      { width: '1200' }
+      { width: '1200' },
     ];
-    
+
     const optimized = createOptimizedPicture(
       imageData.src,
       imageData.alt,
@@ -216,7 +213,7 @@ function buildSlide(row, isFirstSlide = false, config = {}) {
         existingLink.setAttribute('aria-disabled', 'true');
         existingLink.setAttribute('tabindex', '-1');
       }
-      
+
       if (colorVariant.startsWith('#')) {
         // Custom hex color - validate contrast
         validateContrast(colorVariant);
@@ -228,7 +225,7 @@ function buildSlide(row, isFirstSlide = false, config = {}) {
         // Predefined variant
         existingLink.classList.add('button', `button--${colorVariant}`);
       }
-      
+
       buttonGroups.push({ button: p });
       return;
     }
@@ -243,7 +240,7 @@ function buildSlide(row, isFirstSlide = false, config = {}) {
       const button = document.createElement('a');
       button.href = buttonUrl;
       button.textContent = buttonText;
-      
+
       // Accessibility: ARIA attributes
       button.setAttribute('aria-label', buttonText);
       if (buttonUrl === '#') {
@@ -264,7 +261,7 @@ function buildSlide(row, isFirstSlide = false, config = {}) {
         // Predefined variant (white, transparent, brand, accent, dark, outline-dark)
         button.className = `button button--${colorVariant}`;
       }
-      
+
       p.textContent = '';
       p.appendChild(button);
       buttonGroups.push({ button: p });
@@ -275,11 +272,11 @@ function buildSlide(row, isFirstSlide = false, config = {}) {
   if (buttonGroups.length > 0) {
     const actionsWrapper = document.createElement('div');
     actionsWrapper.className = 'hero-cta-actions';
-    
+
     buttonGroups.forEach(({ button }) => {
       actionsWrapper.appendChild(button);
     });
-    
+
     content.appendChild(actionsWrapper);
   }
 
@@ -324,34 +321,34 @@ export default function decorate(block) {
   // Read configuration from block data attributes or section metadata
   // Note: DA.live Section Metadata adds double prefix (data-data-*)
   const config = {
-    align: block.dataset.align 
-      || section?.dataset.dataAlign 
-      || section?.dataset.dataAllign  // Handle typo in DA.live
+    align: block.dataset.align
+      || section?.dataset.dataAlign
+      || section?.dataset.dataAllign // Handle typo in DA.live
       || 'right',
-    vertical: block.dataset.vertical 
-      || section?.dataset.dataVertical 
+    vertical: block.dataset.vertical
+      || section?.dataset.dataVertical
       || 'bottom',
-    size: block.dataset.size 
-      || section?.dataset.dataSize 
+    size: block.dataset.size
+      || section?.dataset.dataSize
       || 'tall',
-    gradientIntensity: block.dataset.gradientIntensity 
+    gradientIntensity: block.dataset.gradientIntensity
       || section?.dataset.dataGradientIntensity
-      || section?.dataset.dataGradientIntesity  // Handle typo in DA.live
+      || section?.dataset.dataGradientIntesity // Handle typo in DA.live
       || 'medium',
-    buttonStyle: block.dataset.buttonStyle 
-      || section?.dataset.dataButtonStyle 
+    buttonStyle: block.dataset.buttonStyle
+      || section?.dataset.dataButtonStyle
       || 'default',
-    imageQuality: block.dataset.imageQuality 
-      || section?.dataset.dataImageQuality 
+    imageQuality: block.dataset.imageQuality
+      || section?.dataset.dataImageQuality
       || 'medium',
     imageMaxWidth: parseInt(
-      block.dataset.imageMaxWidth 
-      || section?.dataset.dataImageMaxWidth 
-      || '2400', 
-      10
+      block.dataset.imageMaxWidth
+      || section?.dataset.dataImageMaxWidth
+      || '2400',
+      10,
     ),
-    buttonWidth: block.dataset.buttonWidth 
-      || section?.dataset.dataButtonWidth 
+    buttonWidth: block.dataset.buttonWidth
+      || section?.dataset.dataButtonWidth
       || 'medium',
   };
 

@@ -24,13 +24,10 @@
   0% {
     background-position: 200% 0;
   }
+
   100% {
     background-position: -200% 0;
   }
-}
-
-.hero-cta[data-loading] .hero-cta-content {
-  opacity: 0.3;
 }
 
 .hero-cta-slides {
@@ -76,7 +73,7 @@
   flex-direction: column;
   align-items: flex-end;
   justify-content: flex-end;
-  padding: 48px 48px 80px 48px;
+  padding: 48px 48px 80px;
   box-sizing: border-box;
 }
 
@@ -85,22 +82,26 @@
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(270deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0) 60%);
+  background: linear-gradient(270deg, rgb(0 0 0 / 55%) 0%, rgb(0 0 0 / 0%) 60%);
 }
 
 /* Gradient intensity variants */
 .hero-cta[data-gradient-intensity='light'] .hero-cta-overlay::before {
-  background: linear-gradient(270deg, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0) 60%);
+  background: linear-gradient(270deg, rgb(0 0 0 / 30%) 0%, rgb(0 0 0 / 0%) 60%);
 }
 
 .hero-cta[data-gradient-intensity='strong'] .hero-cta-overlay::before {
-  background: linear-gradient(270deg, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0) 60%);
+  background: linear-gradient(270deg, rgb(0 0 0 / 70%) 0%, rgb(0 0 0 / 0%) 60%);
 }
 
 .hero-cta-content {
   position: relative;
   max-width: 420px;
   width: min(420px, 100%);
+}
+
+.hero-cta[data-loading] .hero-cta-content {
+  opacity: 0.3;
 }
 
 /* Typography inherits from global styles unless overridden by data attributes */
@@ -124,7 +125,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  margin: 24px 0 0 0;
+  margin: 24px 0 0;
 }
 
 /* Button groups removed - Column 3 now for color variants */
@@ -291,15 +292,7 @@
 }
 
 .hero-cta[data-align='left'] .hero-cta-overlay::before {
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0) 60%);
-}
-
-.hero-cta[data-align='left'][data-gradient-intensity='light'] .hero-cta-overlay::before {
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0) 60%);
-}
-
-.hero-cta[data-align='left'][data-gradient-intensity='strong'] .hero-cta-overlay::before {
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0) 60%);
+  background: linear-gradient(90deg, rgb(0 0 0 / 60%) 0%, rgb(0 0 0 / 0%) 60%);
 }
 
 .hero-cta[data-align='center'] .hero-cta-overlay {
@@ -307,15 +300,23 @@
 }
 
 .hero-cta[data-align='center'] .hero-cta-overlay::before {
-  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0) 65%);
+  background: radial-gradient(circle at center, rgb(0 0 0 / 40%) 0%, rgb(0 0 0 / 0%) 65%);
+}
+
+.hero-cta[data-align='left'][data-gradient-intensity='light'] .hero-cta-overlay::before {
+  background: linear-gradient(90deg, rgb(0 0 0 / 30%) 0%, rgb(0 0 0 / 0%) 60%);
+}
+
+.hero-cta[data-align='left'][data-gradient-intensity='strong'] .hero-cta-overlay::before {
+  background: linear-gradient(90deg, rgb(0 0 0 / 70%) 0%, rgb(0 0 0 / 0%) 60%);
 }
 
 .hero-cta[data-align='center'][data-gradient-intensity='light'] .hero-cta-overlay::before {
-  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0) 65%);
+  background: radial-gradient(circle at center, rgb(0 0 0 / 20%) 0%, rgb(0 0 0 / 0%) 65%);
 }
 
 .hero-cta[data-align='center'][data-gradient-intensity='strong'] .hero-cta-overlay::before {
-  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 65%);
+  background: radial-gradient(circle at center, rgb(0 0 0 / 50%) 0%, rgb(0 0 0 / 0%) 65%);
 }
 
 .hero-cta[data-align='left'] .hero-cta-content {
@@ -368,7 +369,7 @@
   }
 
   .hero-cta-overlay {
-    padding: 32px 32px 64px 32px;
+    padding: 32px 32px 64px;
   }
 
   .hero-cta-content {
@@ -382,7 +383,7 @@
   }
 
   .hero-cta-overlay {
-    padding: 24px 24px 48px 24px;
+    padding: 24px 24px 48px;
   }
 
   .hero-cta-content {
