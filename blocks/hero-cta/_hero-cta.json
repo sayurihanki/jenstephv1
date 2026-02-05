@@ -1,0 +1,17 @@
+{
+  "definitions": [
+    {
+      "title": "Hero CTA",
+      "id": "hero-cta",
+      "plugins": {
+        "da": {
+          "name": "hero-cta",
+          "rows": 2,
+          "columns": 3
+        }
+      }
+    }
+  ],
+  "models": [],
+  "filters": []
+}

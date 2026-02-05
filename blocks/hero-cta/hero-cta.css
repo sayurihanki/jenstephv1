@@ -1,0 +1,404 @@
+/* Removed full-bleed override - respects container width */
+
+.hero-cta {
+  position: relative;
+  min-height: 560px;
+  color: #fff;
+  overflow: hidden;
+  border-radius: var(--shape-border-radius-2);
+}
+
+/* Loading skeleton state */
+.hero-cta[data-loading] {
+  background: linear-gradient(
+    90deg,
+    var(--color-neutral-200) 0%,
+    var(--color-neutral-300) 50%,
+    var(--color-neutral-200) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.hero-cta[data-loading] .hero-cta-content {
+  opacity: 0.3;
+}
+
+.hero-cta-slides {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+}
+
+.hero-cta-slide {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+
+.hero-cta-slide.is-active {
+  opacity: 1;
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .hero-cta-slide {
+    transition: none;
+  }
+}
+
+.hero-cta-media,
+.hero-cta-media picture,
+.hero-cta-media img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hero-cta-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 48px 48px 80px 48px;
+  box-sizing: border-box;
+}
+
+.hero-cta-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(270deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0) 60%);
+}
+
+/* Gradient intensity variants */
+.hero-cta[data-gradient-intensity='light'] .hero-cta-overlay::before {
+  background: linear-gradient(270deg, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0) 60%);
+}
+
+.hero-cta[data-gradient-intensity='strong'] .hero-cta-overlay::before {
+  background: linear-gradient(270deg, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0) 60%);
+}
+
+.hero-cta-content {
+  position: relative;
+  max-width: 420px;
+  width: min(420px, 100%);
+}
+
+/* Typography inherits from global styles unless overridden by data attributes */
+.hero-cta-content h1,
+.hero-cta-content h2,
+.hero-cta-content h3 {
+  margin: 0 0 12px;
+  font-size: clamp(2rem, 3vw, 3rem);
+  line-height: 1.05;
+}
+
+.hero-cta-content p {
+  margin: 0 0 16px;
+}
+
+.hero-cta-content p:last-child {
+  margin-bottom: 0;
+}
+
+.hero-cta-content .hero-cta-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 24px 0 0 0;
+}
+
+/* Button groups removed - Column 3 now for color variants */
+
+.hero-cta-content .hero-cta-actions p {
+  margin: 0;
+}
+
+/* Base button styles - transparent by default */
+.hero-cta-content .hero-cta-actions .button {
+  width: 200px;
+  padding: 14px 28px;
+  justify-content: center;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background-color: transparent;
+  color: var(--color-neutral-50);
+  border: var(--shape-border-width-3) solid var(--color-neutral-50);
+  font-weight: 600;
+  transition: all 0.3s ease;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Default hover: fill with white */
+.hero-cta-content .hero-cta-actions .button:hover,
+.hero-cta-content .hero-cta-actions .button:focus {
+  background-color: var(--color-neutral-50);
+  color: var(--color-brand-500);
+  border-color: var(--color-neutral-50);
+}
+
+/* Variant: Transparent (explicit, same as default) */
+.hero-cta-content .hero-cta-actions .button--transparent {
+  background-color: transparent;
+  color: var(--color-neutral-50);
+  border-color: var(--color-neutral-50);
+}
+
+.hero-cta-content .hero-cta-actions .button--transparent:hover,
+.hero-cta-content .hero-cta-actions .button--transparent:focus {
+  background-color: var(--color-neutral-50);
+  color: var(--color-brand-500);
+}
+
+/* Variant: White solid */
+.hero-cta-content .hero-cta-actions .button--white {
+  background-color: var(--color-neutral-50);
+  color: var(--color-brand-500);
+  border-color: var(--color-neutral-50);
+}
+
+.hero-cta-content .hero-cta-actions .button--white:hover,
+.hero-cta-content .hero-cta-actions .button--white:focus {
+  background-color: var(--color-neutral-100);
+  color: var(--color-brand-700);
+  border-color: var(--color-neutral-100);
+}
+
+/* Variant: Brand color */
+.hero-cta-content .hero-cta-actions .button--brand {
+  background-color: var(--color-brand-500);
+  color: var(--color-neutral-50);
+  border-color: var(--color-brand-500);
+}
+
+.hero-cta-content .hero-cta-actions .button--brand:hover,
+.hero-cta-content .hero-cta-actions .button--brand:focus {
+  background-color: var(--color-brand-600);
+  border-color: var(--color-brand-600);
+}
+
+/* Variant: Accent color */
+.hero-cta-content .hero-cta-actions .button--accent {
+  background-color: var(--color-informational-500);
+  color: var(--color-neutral-50);
+  border-color: var(--color-informational-500);
+}
+
+.hero-cta-content .hero-cta-actions .button--accent:hover,
+.hero-cta-content .hero-cta-actions .button--accent:focus {
+  background-color: var(--color-informational-800);
+  border-color: var(--color-informational-800);
+}
+
+/* Variant: Dark solid */
+.hero-cta-content .hero-cta-actions .button--dark {
+  background-color: var(--color-brand-700);
+  color: var(--color-neutral-50);
+  border-color: var(--color-brand-700);
+}
+
+.hero-cta-content .hero-cta-actions .button--dark:hover,
+.hero-cta-content .hero-cta-actions .button--dark:focus {
+  background-color: var(--color-neutral-900);
+  border-color: var(--color-neutral-900);
+}
+
+/* Variant: Outline dark (for light backgrounds) */
+.hero-cta-content .hero-cta-actions .button--outline-dark {
+  background-color: transparent;
+  color: var(--color-brand-500);
+  border-color: var(--color-brand-500);
+}
+
+.hero-cta-content .hero-cta-actions .button--outline-dark:hover,
+.hero-cta-content .hero-cta-actions .button--outline-dark:focus {
+  background-color: var(--color-brand-500);
+  color: var(--color-neutral-50);
+  border-color: var(--color-brand-500);
+}
+
+/* Custom hex colors */
+.hero-cta-content .hero-cta-actions .button--custom:hover,
+.hero-cta-content .hero-cta-actions .button--custom:focus {
+  opacity: 0.9;
+  transform: translateY(-2px);
+}
+
+/* Accessibility: Focus states for all buttons */
+.hero-cta-content .hero-cta-actions .button:focus-visible {
+  outline: 3px solid var(--color-neutral-50);
+  outline-offset: 2px;
+}
+
+.hero-cta-content .hero-cta-actions .button--outline-dark:focus-visible {
+  outline-color: var(--color-brand-500);
+}
+
+/* Button style variants - Border radius */
+.hero-cta[data-button-style='pill'] .hero-cta-actions .button {
+  border-radius: 32px;
+}
+
+.hero-cta[data-button-style='sharp'] .hero-cta-actions .button {
+  border-radius: 0;
+}
+
+.hero-cta[data-button-style='default'] .hero-cta-actions .button {
+  border-radius: var(--shape-border-radius-2);
+}
+
+/* Button width variants */
+.hero-cta[data-button-width='narrow'] .hero-cta-actions .button {
+  width: 180px;
+  padding: 14px 24px;
+}
+
+.hero-cta[data-button-width='medium'] .hero-cta-actions .button {
+  width: 200px;
+  padding: 14px 28px;
+}
+
+.hero-cta[data-button-width='wide'] .hero-cta-actions .button {
+  width: 260px;
+  padding: 14px 36px;
+}
+
+.hero-cta[data-align='left'] .hero-cta-overlay {
+  align-items: flex-start;
+}
+
+.hero-cta[data-align='left'] .hero-cta-overlay::before {
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0) 60%);
+}
+
+.hero-cta[data-align='left'][data-gradient-intensity='light'] .hero-cta-overlay::before {
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0) 60%);
+}
+
+.hero-cta[data-align='left'][data-gradient-intensity='strong'] .hero-cta-overlay::before {
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0) 60%);
+}
+
+.hero-cta[data-align='center'] .hero-cta-overlay {
+  align-items: center;
+}
+
+.hero-cta[data-align='center'] .hero-cta-overlay::before {
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0) 65%);
+}
+
+.hero-cta[data-align='center'][data-gradient-intensity='light'] .hero-cta-overlay::before {
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0) 65%);
+}
+
+.hero-cta[data-align='center'][data-gradient-intensity='strong'] .hero-cta-overlay::before {
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 65%);
+}
+
+.hero-cta[data-align='left'] .hero-cta-content {
+  text-align: left;
+}
+
+.hero-cta[data-align='left'] .hero-cta-actions {
+  align-items: flex-start;
+}
+
+.hero-cta[data-align='center'] .hero-cta-content {
+  text-align: center;
+}
+
+.hero-cta[data-align='center'] .hero-cta-actions {
+  align-items: center;
+}
+
+.hero-cta[data-align='right'] .hero-cta-content {
+  text-align: right;
+}
+
+.hero-cta[data-align='right'] .hero-cta-actions {
+  align-items: flex-end;
+}
+
+.hero-cta[data-vertical='top'] .hero-cta-overlay {
+  justify-content: flex-start;
+}
+
+.hero-cta[data-vertical='middle'] .hero-cta-overlay {
+  justify-content: center;
+}
+
+.hero-cta[data-size='short'] {
+  min-height: 360px;
+}
+
+.hero-cta[data-size='tall'] {
+  min-height: 640px;
+}
+
+/* Overlay uses absolute positioning and fills parent */
+
+/* Category styles removed - Column 3 now used for button color variants */
+
+@media (max-width: 900px) {
+  .hero-cta {
+    min-height: 520px;
+  }
+
+  .hero-cta-overlay {
+    padding: 32px 32px 64px 32px;
+  }
+
+  .hero-cta-content {
+    max-width: 360px;
+  }
+}
+
+@media (max-width: 600px) {
+  .hero-cta {
+    min-height: 460px;
+  }
+
+  .hero-cta-overlay {
+    padding: 24px 24px 48px 24px;
+  }
+
+  .hero-cta-content {
+    width: 100%;
+  }
+
+  .hero-cta-content .hero-cta-actions .button {
+    width: 100%;
+    max-width: 200px;
+  }
+
+  .hero-cta[data-button-width='narrow'] .hero-cta-actions .button {
+    max-width: 180px;
+  }
+
+  .hero-cta[data-button-width='wide'] .hero-cta-actions .button {
+    max-width: 260px;
+  }
+}
