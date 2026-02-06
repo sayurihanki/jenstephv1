@@ -35,6 +35,20 @@ function sanitizeTel(value = '') {
   return digits ? `tel:${digits}` : '';
 }
 
+function getDisplayAddress(store = {}) {
+  const formatted = store.address?.formattedAddress || store.address?.formatted || '';
+  if (formatted && String(formatted).trim()) return String(formatted).trim();
+
+  const parts = [
+    store.address?.street,
+    store.address?.city,
+    store.address?.state,
+    store.address?.zip,
+  ].filter(Boolean);
+
+  return parts.join(', ');
+}
+
 function trackStoreLocatorEvent(action, payload = {}) {
   const eventPayload = {
     event: 'store_locator_interaction',
@@ -56,6 +70,7 @@ const PLACES_FIELDS = {
   lite: [
     'displayName',
     'formattedAddress',
+    'addressComponents',
     'location',
     'nationalPhoneNumber',
     'regularOpeningHours',
@@ -67,6 +82,7 @@ const PLACES_FIELDS = {
   rich: [
     'displayName',
     'formattedAddress',
+    'addressComponents',
     'location',
     'nationalPhoneNumber',
     'websiteURI',
@@ -1098,14 +1114,9 @@ function renderStoreCard(store, uiConfig = {}) {
   // Address (always visible with fallback)
   const address = document.createElement('address');
   address.classList.add('card-address');
-  if (store.address && (store.address.street || store.address.city)) {
-    const addressParts = [
-      store.address.street,
-      store.address.city,
-      store.address.state,
-      store.address.zip,
-    ].filter(Boolean);
-    address.textContent = addressParts.join(', ');
+  const displayAddress = getDisplayAddress(store);
+  if (displayAddress) {
+    address.textContent = displayAddress;
   } else {
     address.textContent = 'Address not available';
   }
@@ -1778,7 +1789,7 @@ function createInfoWindowContent(store, uiConfig = {}) {
   const ctaLabel = uiConfig.primaryCtaLabel || 'Get Directions';
   const maxVisibleInfoTags = 4;
   const safeStoreName = escapeHtml(store.name || 'Store');
-  const safeAddress = escapeHtml(`${store.address.street}, ${store.address.city}, ${store.address.state} ${store.address.zip}`.trim());
+  const safeAddress = escapeHtml(getDisplayAddress(store) || 'Address not available');
   const safePhoneText = escapeHtml(store.contact?.phone || '');
   const safePhoneHref = sanitizeTel(store.contact?.phone || '');
   const safeWebsiteHref = sanitizeUrl(store.contact?.website || '');
@@ -2275,6 +2286,45 @@ function parseGoogleOpeningHours(regularOpeningHours) {
   return hours;
 }
 
+function getAddressComponent(type, components = []) {
+  return components.find(
+    (component) => Array.isArray(component.types) && component.types.includes(type),
+  );
+}
+
+function getComponentLongText(component) {
+  return component?.longText || component?.long_name || '';
+}
+
+function getComponentShortText(component) {
+  return component?.shortText || component?.short_name || '';
+}
+
+function parseAddressFromComponents(addressComponents = []) {
+  const premise = getComponentLongText(getAddressComponent('premise', addressComponents));
+  const streetNumber = getComponentLongText(getAddressComponent('street_number', addressComponents));
+  const route = getComponentLongText(getAddressComponent('route', addressComponents));
+  const locality = getComponentLongText(getAddressComponent('locality', addressComponents))
+    || getComponentLongText(getAddressComponent('postal_town', addressComponents))
+    || getComponentLongText(getAddressComponent('administrative_area_level_2', addressComponents));
+  const state = getComponentShortText(getAddressComponent('administrative_area_level_1', addressComponents));
+  const zip = getComponentLongText(getAddressComponent('postal_code', addressComponents));
+  const country = getComponentLongText(getAddressComponent('country', addressComponents));
+
+  const street = [streetNumber, route].filter(Boolean).join(' ').trim();
+  const formattedStructured = [premise, street, locality, zip, country].filter(Boolean).join(', ');
+
+  return {
+    premise,
+    street,
+    city: locality,
+    state,
+    zip,
+    country,
+    formattedStructured,
+  };
+}
+
 function getPlaceFields(detailLevel, config) {
   if (detailLevel === 'rich') {
     return PLACES_FIELDS.rich.filter((field) => {
@@ -2287,14 +2337,11 @@ function getPlaceFields(detailLevel, config) {
 }
 
 function buildPlacePayload(place, detailLevel, config) {
-  // Parse address from formattedAddress
-  const addressParts = (place.formattedAddress || '').split(',').map((p) => p.trim());
-  const street = addressParts[0] || '';
-  const city = addressParts[1] || '';
-  const stateZip = addressParts[2] || '';
-  const stateZipParts = stateZip.split(' ');
-  const state = stateZipParts[0] || '';
-  const zip = stateZipParts[1] || '';
+  const parsedAddress = parseAddressFromComponents(place.addressComponents || []);
+  const fallbackFormattedAddress = place.formattedAddress || '';
+  const fallbackAddressParts = fallbackFormattedAddress.split(',').map((p) => p.trim());
+  const fallbackStreet = fallbackAddressParts[0] || '';
+  const fallbackCity = fallbackAddressParts[1] || '';
 
   // Parse Google's opening hours to our format
   const parsedHours = parseGoogleOpeningHours(place.regularOpeningHours);
@@ -2340,10 +2387,13 @@ function buildPlacePayload(place, detailLevel, config) {
   return {
     displayName: place.displayName,
     address: {
-      street,
-      city,
-      state,
-      zip,
+      formattedAddress: parsedAddress.formattedStructured || fallbackFormattedAddress,
+      street: parsedAddress.street || fallbackStreet,
+      city: parsedAddress.city || fallbackCity,
+      state: parsedAddress.state || '',
+      zip: parsedAddress.zip || '',
+      country: parsedAddress.country || '',
+      premise: parsedAddress.premise || '',
       coordinates: {
         lat: place.location?.lat?.() || 0,
         lng: place.location?.lng?.() || 0,

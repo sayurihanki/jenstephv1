@@ -84,10 +84,13 @@
   --sl-card-shadow: 0 1px 3px rgb(0 0 0 / 8%);
   --sl-card-shadow-hover: 0 2px 8px rgb(0 0 0 / 10%);
   --sl-card-meta-surface: linear-gradient(135deg, rgb(248 250 252 / 90%) 0%, rgb(255 255 255 / 96%) 100%);
+  --sl-card-component-radius: 10px;
+  --sl-card-meta-radius: var(--sl-card-component-radius);
   --sl-card-distance: #1a73e8;
   --sl-card-text: #202124;
   --sl-card-text-muted: #4b5563;
   --sl-card-section-gap: 12px;
+  --sl-card-grid-width: 345px;
   
   /* Transitions */
   --sl-transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
@@ -619,8 +622,9 @@ main > .section.store-locator-container[data-width="full"] .store-locator.block 
 .store-list {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--sl-card-grid-width)), var(--sl-card-grid-width)));
   gap: 20px;
+  justify-content: start;
   overflow: visible;
   max-height: none;
   flex-shrink: 0;
@@ -688,7 +692,7 @@ main > .section.store-locator-container[data-width="full"] .store-locator.block 
 .card-photo-wrap {
   width: 100%;
   height: 160px;
-  border-radius: 10px;
+  border-radius: var(--sl-card-component-radius);
   overflow: hidden;
   margin: 0 0 var(--sl-card-section-gap);
   background: #f3f4f6;
@@ -732,7 +736,7 @@ main > .section.store-locator-container[data-width="full"] .store-locator.block 
   gap: 8px;
   width: 100%;
   padding: 6px 10px;
-  border-radius: 9999px;
+  border-radius: var(--sl-card-meta-radius);
   border: 1px solid var(--sl-card-border-strong);
   background: var(--sl-card-meta-surface);
 }
@@ -775,7 +779,7 @@ main > .section.store-locator-container[data-width="full"] .store-locator.block 
   align-items: center;
   gap: 6px;
   padding: 0;
-  border-radius: 9999px;
+  border-radius: var(--sl-card-meta-radius);
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0;
@@ -842,7 +846,7 @@ main > .section.store-locator-container[data-width="full"] .store-locator.block 
   font-size: 13px;
   margin-bottom: 8px;
   padding: 6px 10px;
-  border-radius: 8px;
+  border-radius: var(--sl-card-component-radius);
   border: 1px solid #fce8c3;
   background: linear-gradient(135deg, #fef3e2 0%, #fff9f0 100%);
   min-height: 36px;
@@ -944,7 +948,7 @@ main > .section.store-locator-container[data-width="full"] .store-locator.block 
   padding: 5px 10px;
   background: linear-gradient(135deg, rgb(248 249 250 / 85%) 0%, rgb(255 255 255 / 95%) 100%);
   border: 1px solid rgb(218 220 224 / 90%);
-  border-radius: 9999px;
+  border-radius: var(--sl-card-component-radius);
   font-size: 11px;
   color: #5f6368;
   font-weight: 500;
@@ -989,7 +993,7 @@ main > .section.store-locator-container[data-width="full"] .store-locator.block 
   align-items: center;
   gap: 8px;
   border: 1px solid #d1d5db;
-  border-radius: 9999px;
+  border-radius: var(--sl-card-component-radius);
   padding: 5px 10px;
   background: linear-gradient(135deg, rgb(248 250 252 / 90%) 0%, #fff 100%);
 }
@@ -1018,7 +1022,7 @@ main > .section.store-locator-container[data-width="full"] .store-locator.block 
   line-height: 1.5;
   margin-bottom: 0;
   padding: 6px 10px;
-  border-radius: 8px;
+  border-radius: var(--sl-card-component-radius);
   border: 1px solid #d6dbe3;
   background: linear-gradient(135deg, rgb(248 250 252 / 90%) 0%, #fff 100%);
   white-space: nowrap;
@@ -1309,7 +1313,7 @@ a.btn-primary {
   background: linear-gradient(135deg, rgb(218 234 255 / 88%) 0%, rgb(255 255 255 / 92%) 100%) !important;
   color: #0f4db6 !important;
   border: 1px solid rgb(160 196 255 / 95%);
-  border-radius: var(--sl-radius-sm);
+  border-radius: var(--sl-card-component-radius);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -1377,7 +1381,7 @@ a.btn-primary:visited,
   padding: 10px 12px;
   background: linear-gradient(135deg, rgb(232 240 254 / 62%) 0%, rgb(255 255 255 / 95%) 100%);
   border: 1px solid rgb(210 227 252 / 95%);
-  border-radius: var(--sl-radius-sm);
+  border-radius: var(--sl-card-component-radius);
   color: #1f3f7a;
   font-size: 13px;
   font-weight: 600;
@@ -1491,13 +1495,15 @@ a.btn-primary:visited,
 @media (min-width: 1024px) {
   .store-locator-content[data-view="split"] {
     display: grid;
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    grid-template-columns: max-content minmax(0, 1fr);
     align-items: start;
     gap: var(--spacing-medium);
   }
 
   .store-locator-content[data-view="split"] .store-list {
     order: 1;
+    grid-template-columns: repeat(2, minmax(0, var(--sl-card-grid-width)));
+    width: max-content;
   }
 
   .store-locator-content[data-view="split"] .store-map {
