@@ -49,7 +49,7 @@
   border: 2px solid var(--color-neutral-300);
   border-radius: 50px;
   overflow: hidden;
-  transition: all 0.3s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
   box-shadow: 0 2px 12px rgb(0 0 0 / 6%);
   padding-right: 8px;
 }
@@ -60,73 +60,25 @@
   transform: translateY(-1px);
 }
 
-/* Input wrapper - ensure completely transparent and flush left */
+/* Use a stable focus ring on the control wrapper */
+.search-bar-form:focus-within {
+  border-color: var(--color-brand-500);
+  box-shadow: 0 0 0 2px var(--color-neutral-200), 0 2px 12px rgb(0 0 0 / 6%);
+}
+
+/* Input wrapper */
 .search-bar-input-wrapper {
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
-  background: transparent !important;
-  background-color: transparent !important;
-  border: none !important;
-  margin: 0 !important;
-  padding: 0 !important;
   min-width: 0;
-  position: relative;
+}
+
+/* Constrain customization to known drop-in wrappers */
+.search-bar-input-wrapper .dropin-input-container,
+.search-bar-input-wrapper .dropin-field {
   width: 100%;
-  max-width: 100%;
-}
-
-/* Ensure no white backgrounds can appear in input wrapper area */
-.search-bar-input-wrapper::before,
-.search-bar-input-wrapper::after {
-  display: none !important;
-  content: none !important;
-}
-
-/* Hide any drop-in container backgrounds/borders - all levels */
-.search-bar-input-wrapper,
-.search-bar-input-wrapper *:not(input, svg, path, button) {
-  background: transparent !important;
-  background-color: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-  margin: 0 !important;
-}
-
-/* Force remove any inline styles that might add backgrounds */
-.search-bar-input-wrapper[style*="background"],
-.search-bar-input-wrapper div[style*="background"] {
-  background: transparent !important;
-  background-color: transparent !important;
-}
-
-/* Ensure wrapper divs are full width and transparent */
-.search-bar-input-wrapper > div,
-.search-bar-input-wrapper div {
-  width: 100%;
-  display: flex;
-  flex: 1;
-  background: transparent !important;
-  background-color: transparent !important;
-}
-
-/* Catch-all: Remove white backgrounds from ANY element in input area */
-.search-bar-form .search-bar-input-wrapper,
-.search-bar-form .search-bar-input-wrapper *:not(.search-bar-icon),
-.search-bar-form .search-bar-input-wrapper *::before,
-.search-bar-form .search-bar-input-wrapper *::after {
-  background: transparent !important;
-}
-
-/* Remove backgrounds from any pseudo-elements */
-.search-bar-input-wrapper::before,
-.search-bar-input-wrapper::after,
-.search-bar-input-wrapper div::before,
-.search-bar-input-wrapper div::after {
-  background: transparent !important;
-  background-color: transparent !important;
-  border: none !important;
+  margin: 0;
 }
 
 /* Input field */
@@ -137,13 +89,11 @@
   border: none !important;
   background: transparent !important;
   padding: 14px var(--spacing-big) 14px var(--spacing-big) !important;
-  font-size: var(--type-body-l-size) !important;
+  font: var(--type-body-1-default-font) !important;
+  letter-spacing: var(--type-body-1-default-letter-spacing) !important;
   color: var(--color-neutral-900) !important;
-  font-family: inherit !important;
-  font-weight: 400 !important;
   box-shadow: none !important;
-  outline: none !important;
-  line-height: 1.5 !important;
+  line-height: 1.4 !important;
 }
 
 /* Remove browser autocomplete blue background */
@@ -154,9 +104,8 @@
 .search-bar-form input:-webkit-autofill,
 .search-bar-form input:-webkit-autofill:hover,
 .search-bar-form input:-webkit-autofill:focus {
-  box-shadow: 0 0 0 1000px white inset !important;
+  box-shadow: 0 0 0 1000px var(--color-neutral-50) inset !important;
   -webkit-text-fill-color: var(--color-neutral-900) !important;
-  background-color: transparent !important;
 }
 
 .search-bar-form input[type="search"]::placeholder,
@@ -180,18 +129,20 @@
   transition: all 0.25s ease;
   flex-shrink: 0;
   border-radius: 50%;
-  margin: 0;
+  margin: 0 0 0 var(--spacing-xsmall);
+  position: relative;
+  z-index: 1;
 }
 
 .search-bar-icon:hover {
   background: var(--color-brand-500);
   color: white;
-  transform: scale(1.05);
-  box-shadow: 0 4px 12px rgb(var(--color-brand-500-rgb, 74 144 226), 0.2);
+  transform: none;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 20%);
 }
 
 .search-bar-icon:active {
-  transform: scale(0.95);
+  transform: translateY(1px);
 }
 
 .search-bar-icon:focus-visible {
@@ -220,7 +171,7 @@
   top: calc(100% + 12px);
   left: 0;
   right: 0;
-  z-index: 999;
+  z-index: 11;
   padding: var(--spacing-big);
   background: white;
   border: 2px solid var(--color-neutral-200);
@@ -262,7 +213,8 @@
   .search-bar-form input[type="search"],
   .search-bar-input-wrapper input {
     padding: 10px var(--spacing-medium) 10px var(--spacing-medium) !important;
-    font-size: var(--type-body-m-size) !important;
+    font: var(--type-body-2-default-font) !important;
+    letter-spacing: var(--type-body-2-default-letter-spacing) !important;
     line-height: 1.4 !important;
   }
 
@@ -291,36 +243,23 @@
   }
 }
 
-/* Focus visible for accessibility - disabled per user preference */
-.search-bar-form:focus-visible {
-  outline: none;
-}
-
-
 /* Integration with drop-in components */
-.search-bar-results .dropin-product-list {
+.search-bar-results .product-discovery-product-list__grid {
+  margin-block: var(--spacing-small);
+}
+
+.search-bar-results .dropin-product-item-card {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: var(--spacing-medium);
-}
-
-@media (max-width: 767px) {
-  .search-bar-results .dropin-product-list {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: var(--spacing-small);
-  }
-}
-
-/* Ensure drop-in product cards look good */
-.search-bar-results .dropin-product-card {
+  grid-template-columns: 72px 1fr;
+  gap: var(--spacing-small);
+  padding: var(--spacing-xsmall);
   background: var(--color-neutral-50);
   border: 1px solid var(--color-neutral-200);
   border-radius: var(--shape-border-radius-1);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.search-bar-results .dropin-product-card:hover {
+.search-bar-results .dropin-product-item-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgb(0 0 0 / 10%);
 }
-
