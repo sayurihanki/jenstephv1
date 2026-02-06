@@ -8,6 +8,33 @@ const debugLog = (...args) => {
   }
 };
 
+function escapeHtml(value = '') {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function sanitizeUrl(url, fallback = '#') {
+  if (!url) return fallback;
+  try {
+    const parsed = new URL(url, window.location.origin);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.href;
+    }
+  } catch (e) {
+    // ignore invalid URLs
+  }
+  return fallback;
+}
+
+function sanitizeTel(value = '') {
+  const digits = String(value).replace(/\D/g, '');
+  return digits ? `tel:${digits}` : '';
+}
+
 /**
  * Parse block configuration from DA.live table rows
  * @param {Element} block - The block element from DA.live
@@ -820,9 +847,9 @@ function renderStoreCard(store, showDistance = true) {
   const directionsBtn = document.createElement('a');
   directionsBtn.classList.add('btn-primary');
   if (store.placeId) {
-    directionsBtn.href = `https://www.google.com/maps/place/?q=place_id:${store.placeId}`;
+    directionsBtn.href = sanitizeUrl(`https://www.google.com/maps/place/?q=place_id:${store.placeId}`);
   } else {
-    directionsBtn.href = `https://maps.google.com/?q=${store.address.coordinates.lat},${store.address.coordinates.lng}`;
+    directionsBtn.href = sanitizeUrl(`https://maps.google.com/?q=${store.address.coordinates.lat},${store.address.coordinates.lng}`);
   }
   directionsBtn.target = '_blank';
   directionsBtn.rel = 'noopener noreferrer';
@@ -1230,6 +1257,12 @@ function createSearchSection(
  * @returns {string} HTML content for info window
  */
 function createInfoWindowContent(store) {
+  const safeStoreName = escapeHtml(store.name || 'Store');
+  const safeAddress = escapeHtml(`${store.address.street}, ${store.address.city}, ${store.address.state} ${store.address.zip}`.trim());
+  const safePhoneText = escapeHtml(store.contact?.phone || '');
+  const safePhoneHref = sanitizeTel(store.contact?.phone || '');
+  const safeWebsiteHref = sanitizeUrl(store.contact?.website || '');
+  const safeDirectionsHref = sanitizeUrl(store.directionsUrl || '#');
   const isOpen = isStoreOpen(store);
   const statusClass = isOpen ? 'open' : 'closed';
   const hoursText = getTodayHours(store);
@@ -1250,7 +1283,7 @@ function createInfoWindowContent(store) {
     `).join('');
     photoHTML = `
       <div class="info-photos-container">
-        <div class="info-photos" role="group" aria-label="Photos of ${store.name}">
+        <div class="info-photos" role="group" aria-label="Photos of ${safeStoreName}">
           ${photoSlides}
         </div>
         ${photos.length > 1 ? `
@@ -1288,15 +1321,15 @@ function createInfoWindowContent(store) {
           <div class="info-review-header">
             <div class="info-review-author">
               <div class="info-review-author-info">
-                <span class="info-review-author-name">${review.author}</span>
-                <span class="info-review-time">${review.relativeTime}</span>
+                <span class="info-review-author-name">${escapeHtml(review.author)}</span>
+                <span class="info-review-time">${escapeHtml(review.relativeTime)}</span>
               </div>
             </div>
             <div class="info-review-rating">
               <span class="info-review-stars">${reviewStars}</span>
             </div>
           </div>
-          <p class="info-review-text">${truncatedText}</p>
+          <p class="info-review-text">${escapeHtml(truncatedText)}</p>
         </div>
       `;
     }).join('');
@@ -1383,7 +1416,7 @@ function createInfoWindowContent(store) {
     const tagsHTML = supplementaryItems.length > 0
       ? `
         <div class="info-supplementary-tags">
-          ${supplementaryItems.map((item) => `<span class="info-tag">${item}</span>`).join('')}
+          ${supplementaryItems.map((item) => `<span class="info-tag">${escapeHtml(item)}</span>`).join('')}
         </div>
       `
       : '';
@@ -1392,7 +1425,7 @@ function createInfoWindowContent(store) {
       ? `
         <div class="info-links-row">
           ${store.contact?.website ? `
-            <a href="${store.contact.website}" target="_blank" rel="noopener noreferrer" class="info-link">
+            <a href="${safeWebsiteHref}" target="_blank" rel="noopener noreferrer" class="info-link">
               <svg viewBox="0 0 24 24" width="18" height="18">
                 <path fill="currentColor" d="M12 2a10 10 0 100 20 10 10 0 000-20zm7.93 9h-3.02a15.6 15.6 0 00-1.2-5.1A8.02 8.02 0 0119.93 11zM12 4c1.3 0 2.92 2.25 3.55 5H8.45C9.08 6.25 10.7 4 12 4zM4.07 13h3.02a15.6 15.6 0 001.2 5.1A8.02 8.02 0 014.07 13zM4.07 11A8.02 8.02 0 018.29 5.9 15.6 15.6 0 007.09 11H4.07zm7.93 9c-1.3 0-2.92-2.25-3.55-5h7.1C14.92 17.75 13.3 20 12 20zm3.71-1.9A15.6 15.6 0 0016.91 13h3.02a8.02 8.02 0 01-4.22 5.1z"/>
               </svg>
@@ -1400,7 +1433,7 @@ function createInfoWindowContent(store) {
             </a>
           ` : ''}
           ${store.directionsUrl ? `
-            <a href="${store.directionsUrl}" target="_blank" rel="noopener noreferrer" class="info-link">
+            <a href="${safeDirectionsHref}" target="_blank" rel="noopener noreferrer" class="info-link">
               <svg viewBox="0 0 24 24" width="18" height="18">
                 <path fill="currentColor" d="M21.71 11.29l-9-9a.996.996 0 00-1.41 0l-9 9a.996.996 0 000 1.41l9 9c.39.39 1.02.39 1.41 0l9-9a.996.996 0 000-1.41zM14 14.5V12h-4v3H8v-4c0-.55.45-1 1-1h5V7.5l3.5 3.5-3.5 3.5z"/>
               </svg>
@@ -1421,13 +1454,13 @@ function createInfoWindowContent(store) {
 
   // Build phone HTML
   let phoneHTML = '';
-  if (store.contact?.phone) {
+  if (store.contact?.phone && safePhoneHref) {
     phoneHTML = `
       <div class="info-row">
         <svg class="info-icon-svg" viewBox="0 0 24 24" width="20" height="20">
           <path fill="#5f6368" d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
         </svg>
-        <a href="tel:${store.contact.phone.replace(/\D/g, '')}">${store.contact.phone}</a>
+        <a href="${safePhoneHref}">${safePhoneText}</a>
       </div>
     `;
   }
@@ -1450,7 +1483,7 @@ function createInfoWindowContent(store) {
       ${photoHTML}
       <div class="info-content">
         <h4 class="info-name">
-          <a href="${store.directionsUrl || '#'}" target="_blank" rel="noopener noreferrer" class="info-name-link">${store.name}</a>
+          <a href="${safeDirectionsHref}" target="_blank" rel="noopener noreferrer" class="info-name-link">${safeStoreName}</a>
         </h4>
         ${ratingHTML}
         ${fullHoursHTML}
@@ -1458,7 +1491,7 @@ function createInfoWindowContent(store) {
           <svg class="info-icon-svg" viewBox="0 0 24 24" width="20" height="20">
             <path fill="#ea4335" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
           </svg>
-          <span class="info-address-text">${store.address.street}, ${store.address.city}, ${store.address.state} ${store.address.zip}</span>
+          <span class="info-address-text">${safeAddress}</span>
         </div>
         ${phoneHTML}
         ${distanceHTML}
@@ -1477,7 +1510,7 @@ function createInfoWindowContent(store) {
  * @param {number} zoomLevel - Map zoom level
  * @returns {Promise<Object|null>} Map instance or null
  */
-async function initializeMap(container, stores, center, zoomLevel) {
+async function initializeMap(container, stores, center, zoomLevel, existingMapState = null) {
   // Check if Google Maps is available
   if (typeof google === 'undefined' || !google.maps) {
     container.innerHTML = '<p class="map-placeholder">📍 Map requires Google Maps API key.<br><br>Add <strong>"Google Maps API Key"</strong> in your DA.live block configuration to enable the interactive map.<br><br>The store list and search features work without it!</p>';
@@ -1488,15 +1521,35 @@ async function initializeMap(container, stores, center, zoomLevel) {
     // Import the NEW marker library using importLibrary (pure new approach)
     const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary('marker');
 
-    const map = new google.maps.Map(container, {
-      center: { lat: center.lat, lng: center.lng },
-      zoom: zoomLevel,
-      mapTypeControl: false,
-      streetViewControl: false,
-      mapId: 'STORE_LOCATOR_MAP', // Required for Advanced Markers
-    });
+    const mapState = existingMapState || {
+      map: null,
+      storeMarkers: [],
+      userMarker: null,
+      infoWindows: [],
+    };
 
-    // Add user location marker using NEW AdvancedMarkerElement
+    if (!mapState.map) {
+      mapState.map = new google.maps.Map(container, {
+        center: { lat: center.lat, lng: center.lng },
+        zoom: zoomLevel,
+        mapTypeControl: false,
+        streetViewControl: false,
+        mapId: 'STORE_LOCATOR_MAP', // Required for Advanced Markers
+      });
+    } else {
+      mapState.map.setCenter({ lat: center.lat, lng: center.lng });
+      mapState.map.setZoom(zoomLevel);
+    }
+
+    // Clean up old store markers and info windows before rendering new set
+    mapState.storeMarkers.forEach((marker) => {
+      marker.map = null;
+    });
+    mapState.storeMarkers = [];
+    mapState.infoWindows.forEach((iw) => iw.close());
+    mapState.infoWindows = [];
+
+    // Add/update user location marker using NEW AdvancedMarkerElement
     const userPin = new PinElement({
       scale: 1.2,
       background: '#4285F4',
@@ -1504,9 +1557,12 @@ async function initializeMap(container, stores, center, zoomLevel) {
       glyphColor: '#ffffff',
     });
 
-    // eslint-disable-next-line no-new
-    new AdvancedMarkerElement({
-      map,
+    if (mapState.userMarker) {
+      mapState.userMarker.map = null;
+      mapState.userMarker = null;
+    }
+    mapState.userMarker = new AdvancedMarkerElement({
+      map: mapState.map,
       position: { lat: center.lat, lng: center.lng },
       title: 'Your Location',
       content: userPin.element,
@@ -1522,7 +1578,7 @@ async function initializeMap(container, stores, center, zoomLevel) {
       });
 
       const marker = new AdvancedMarkerElement({
-        map,
+        map: mapState.map,
         position: {
           lat: store.address.coordinates.lat,
           lng: store.address.coordinates.lng,
@@ -1535,15 +1591,20 @@ async function initializeMap(container, stores, center, zoomLevel) {
         content: createInfoWindowContent(store),
         maxWidth: 320,
       });
+      mapState.infoWindows.push(infoWindow);
+      mapState.storeMarkers.push(marker);
 
       marker.addListener('click', () => {
-        infoWindow.open(map, marker);
+        infoWindow.open(mapState.map, marker);
 
         // Wait for InfoWindow to render, then attach event listeners
         google.maps.event.addListenerOnce(infoWindow, 'domready', () => {
           // Hours dropdown toggle
-          const toggleBtn = document.querySelector('[data-toggle-hours]');
-          const dropdown = document.querySelector('[data-hours-dropdown]');
+          const infoRoot = document.querySelector('.gm-style .map-info-window');
+          if (!infoRoot) return;
+
+          const toggleBtn = infoRoot.querySelector('[data-toggle-hours]');
+          const dropdown = infoRoot.querySelector('[data-hours-dropdown]');
 
           if (toggleBtn && dropdown) {
             toggleBtn.addEventListener('click', () => {
@@ -1555,8 +1616,8 @@ async function initializeMap(container, stores, center, zoomLevel) {
           }
 
           // Photo carousel scroll indicators
-          const photosContainer = document.querySelector('.info-photos');
-          const indicators = document.querySelectorAll('.info-photo-dot');
+          const photosContainer = infoRoot.querySelector('.info-photos');
+          const indicators = infoRoot.querySelectorAll('.info-photo-dot');
 
           if (photosContainer && indicators.length > 0) {
             // Update active indicator on scroll
@@ -1589,7 +1650,7 @@ async function initializeMap(container, stores, center, zoomLevel) {
     });
 
     debugLog('✅ Map initialized with NEW Advanced Markers');
-    return map;
+    return mapState;
   } catch (error) {
     console.error('Map initialization error:', error);
     container.innerHTML = '<p class="map-error">Unable to load map. Please try again later.</p>';
@@ -1961,9 +2022,9 @@ export default async function decorate(block) {
    */
   function handleSortChange(sortBy) {
     currentSort = sortBy;
-    const services = Array.from(document.querySelectorAll('.service-checkbox:checked'))
+    const services = Array.from(container.querySelectorAll('.service-checkbox:checked'))
       .map((cb) => cb.value);
-    const openNow = document.querySelector('.open-now-checkbox')?.checked || false;
+    const openNow = container.querySelector('.open-now-checkbox')?.checked || false;
 
     filteredStores = applyFiltersAndSort(allStores, services, openNow);
     renderStores(filteredStores);
@@ -1972,7 +2033,9 @@ export default async function decorate(block) {
     if (mapInstance && userLocation) {
       const fallback = { lat: 45.5231, lng: -122.6765 };
       const mapCenter = userLocation || filteredStores[0]?.address.coordinates || fallback;
-      initializeMap(mapContainer, filteredStores, mapCenter, config.zoomLevel);
+      initializeMap(mapContainer, filteredStores, mapCenter, config.zoomLevel, mapInstance)
+        .then((nextMapInstance) => { mapInstance = nextMapInstance; })
+        .catch((error) => console.error('Map refresh failed:', error));
     }
   }
 
@@ -1996,7 +2059,9 @@ export default async function decorate(block) {
 
         // Update map
         if (mapInstance) {
-          initializeMap(mapContainer, filteredStores, userLocation, config.zoomLevel);
+          initializeMap(mapContainer, filteredStores, userLocation, config.zoomLevel, mapInstance)
+            .then((nextMapInstance) => { mapInstance = nextMapInstance; })
+            .catch((error) => console.error('Map refresh failed:', error));
         }
       } catch (error) {
         const errorMsg = document.createElement('p');
@@ -2030,7 +2095,9 @@ export default async function decorate(block) {
 
         // Update map
         if (mapInstance) {
-          initializeMap(mapContainer, filteredStores, userLocation, config.zoomLevel);
+          initializeMap(mapContainer, filteredStores, userLocation, config.zoomLevel, mapInstance)
+            .then((nextMapInstance) => { mapInstance = nextMapInstance; })
+            .catch((error) => console.error('Map refresh failed:', error));
         }
       } catch (error) {
         console.error('Address search error:', error);
@@ -2065,7 +2132,9 @@ export default async function decorate(block) {
 
       // Update map if needed
       if (mapInstance && userLocation) {
-        initializeMap(mapContainer, filteredStores, userLocation, config.zoomLevel);
+        initializeMap(mapContainer, filteredStores, userLocation, config.zoomLevel, mapInstance)
+          .then((nextMapInstance) => { mapInstance = nextMapInstance; })
+          .catch((error) => console.error('Map refresh failed:', error));
       }
     }
   }
@@ -2172,6 +2241,7 @@ export default async function decorate(block) {
           filteredStores,
           mapCenter,
           config.zoomLevel,
+          mapInstance,
         );
       } catch (error) {
         console.error('Failed to load Google Maps:', error);
@@ -2182,7 +2252,13 @@ export default async function decorate(block) {
       // No API key provided - show helpful message
       const fallback = { lat: 45.5231, lng: -122.6765 };
       const mapCenter = userLocation || filteredStores[0]?.address.coordinates || fallback;
-      mapInstance = await initializeMap(mapContainer, filteredStores, mapCenter, config.zoomLevel);
+      mapInstance = await initializeMap(
+        mapContainer,
+        filteredStores,
+        mapCenter,
+        config.zoomLevel,
+        mapInstance,
+      );
     }
   } catch (error) {
     console.error('Store locator error:', error);
