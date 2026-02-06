@@ -1401,10 +1401,10 @@ function createSearchSection(
 
   // Sort controls
   const sortSection = document.createElement('div');
-  sortSection.classList.add('sort-controls');
+  sortSection.classList.add('sort-controls', 'sort-controls-sort');
 
   const sortLabel = document.createElement('label');
-  sortLabel.textContent = 'Sort by:';
+  sortLabel.textContent = 'Sort';
   sortLabel.classList.add('sort-label');
   sortLabel.setAttribute('for', 'sort-select');
   sortSection.appendChild(sortLabel);
@@ -1435,10 +1435,10 @@ function createSearchSection(
 
   // Radius controls
   const radiusSection = document.createElement('div');
-  radiusSection.classList.add('sort-controls');
+  radiusSection.classList.add('sort-controls', 'sort-controls-radius');
 
   const radiusLabel = document.createElement('label');
-  radiusLabel.textContent = `Radius (${config.units === 'km' ? 'km' : 'mi'}):`;
+  radiusLabel.textContent = 'Radius';
   radiusLabel.classList.add('sort-label');
   radiusLabel.setAttribute('for', 'radius-select');
   radiusSection.appendChild(radiusLabel);
@@ -1464,21 +1464,9 @@ function createSearchSection(
   radiusSection.appendChild(radiusSelect);
   controlsRow.appendChild(radiusSection);
 
-  // Services filter
-  const filterSection = document.createElement('div');
-  filterSection.classList.add('services-filter');
-
-  const filterLabel = document.createElement('label');
-  filterLabel.textContent = 'Filter:';
-  filterLabel.classList.add('filter-label');
-  filterSection.appendChild(filterLabel);
-
-  const filterWrapper = document.createElement('div');
-  filterWrapper.classList.add('filter-checkboxes');
-
-  // Add "Open Now" filter first
+  // Quick "Open Now" filter (kept visible in the toolbar)
   const openNowWrapper = document.createElement('label');
-  openNowWrapper.classList.add('checkbox-label', 'checkbox-open-now');
+  openNowWrapper.classList.add('checkbox-label', 'checkbox-open-now', 'checkbox-open-now-inline');
 
   const openNowCheckbox = document.createElement('input');
   openNowCheckbox.type = 'checkbox';
@@ -1496,16 +1484,35 @@ function createSearchSection(
 
   openNowWrapper.appendChild(openNowCheckbox);
   openNowWrapper.appendChild(openNowLabel);
-  filterWrapper.appendChild(openNowWrapper);
+  controlsRow.appendChild(openNowWrapper);
+
+  // Services filter drawer
+  const filterSection = document.createElement('div');
+  filterSection.classList.add('services-filter');
+
+  const filterToggleBtn = document.createElement('button');
+  filterToggleBtn.type = 'button';
+  filterToggleBtn.classList.add('filter-drawer-toggle');
+  filterToggleBtn.setAttribute('aria-expanded', 'false');
+  filterToggleBtn.setAttribute('aria-label', 'Open service filters');
+  filterToggleBtn.textContent = 'Filters';
+
+  const filterPanel = document.createElement('div');
+  filterPanel.classList.add('filter-drawer-panel');
+  filterPanel.hidden = true;
+
+  const filterLabel = document.createElement('label');
+  filterLabel.textContent = 'Services';
+  filterLabel.classList.add('filter-label');
+  filterPanel.appendChild(filterLabel);
+
+  const filterWrapper = document.createElement('div');
+  filterWrapper.classList.add('filter-checkboxes');
 
   // Add service filters (only services that actually exist in the data)
-  const visibleServiceCount = 6;
-  availableServices.forEach((service, index) => {
+  availableServices.forEach((service) => {
     const checkboxWrapper = document.createElement('label');
     checkboxWrapper.classList.add('checkbox-label');
-    if (index >= visibleServiceCount) {
-      checkboxWrapper.classList.add('is-extra');
-    }
 
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
@@ -1526,19 +1533,100 @@ function createSearchSection(
     filterWrapper.appendChild(checkboxWrapper);
   });
 
-  filterSection.appendChild(filterWrapper);
+  filterPanel.appendChild(filterWrapper);
 
-  if (availableServices.length > visibleServiceCount) {
-    const moreFiltersBtn = document.createElement('button');
-    moreFiltersBtn.type = 'button';
-    moreFiltersBtn.classList.add('filter-more-btn');
-    moreFiltersBtn.textContent = 'More filters';
-    moreFiltersBtn.addEventListener('click', () => {
-      const expanded = filterSection.classList.toggle('is-expanded');
-      moreFiltersBtn.textContent = expanded ? 'Less filters' : 'More filters';
-    }, { signal });
-    filterSection.appendChild(moreFiltersBtn);
-  }
+  const filterPanelActions = document.createElement('div');
+  filterPanelActions.classList.add('filter-panel-actions');
+
+  const filterResetBtn = document.createElement('button');
+  filterResetBtn.type = 'button';
+  filterResetBtn.classList.add('filter-panel-btn', 'filter-panel-btn-reset');
+  filterResetBtn.textContent = 'Reset';
+
+  const filterApplyBtn = document.createElement('button');
+  filterApplyBtn.type = 'button';
+  filterApplyBtn.classList.add('filter-panel-btn', 'filter-panel-btn-apply');
+  filterApplyBtn.textContent = 'Apply';
+
+  filterPanelActions.appendChild(filterResetBtn);
+  filterPanelActions.appendChild(filterApplyBtn);
+  filterPanel.appendChild(filterPanelActions);
+  filterSection.appendChild(filterToggleBtn);
+  filterSection.appendChild(filterPanel);
+
+  const updateFilterToggleLabel = () => {
+    const selectedCount = filterWrapper.querySelectorAll('.service-checkbox:checked').length;
+    filterToggleBtn.textContent = selectedCount > 0 ? `Filters (${selectedCount})` : 'Filters';
+    filterToggleBtn.classList.toggle('has-selection', selectedCount > 0);
+  };
+
+  filterToggleBtn.addEventListener('click', () => {
+    const expanded = filterToggleBtn.getAttribute('aria-expanded') === 'true';
+    filterToggleBtn.setAttribute('aria-expanded', String(!expanded));
+    filterPanel.hidden = expanded;
+  }, { signal });
+
+  document.addEventListener('click', (event) => {
+    if (!filterSection.contains(event.target)) {
+      filterPanel.hidden = true;
+      filterToggleBtn.setAttribute('aria-expanded', 'false');
+    }
+  }, { signal });
+
+  filterApplyBtn.addEventListener('click', () => {
+    const selectedServices = Array.from(filterWrapper.querySelectorAll('.service-checkbox:checked'))
+      .map((cb) => cb.value);
+    const openNow = openNowCheckbox.checked;
+    const radius = Number.parseInt(radiusSelect.value, 10) || 0;
+
+    savePreferences({
+      selectedServices,
+      openNow,
+      selectedRadius: radius,
+    });
+    trackStoreLocatorEvent('filter_apply', {
+      services: selectedServices.join(','),
+      openNow,
+      radius,
+    });
+    onSearch({
+      type: 'filter',
+      services: selectedServices,
+      openNow,
+      radius,
+    });
+    filterPanel.hidden = true;
+    filterToggleBtn.setAttribute('aria-expanded', 'false');
+  }, { signal });
+
+  filterResetBtn.addEventListener('click', () => {
+    filterWrapper.querySelectorAll('.service-checkbox').forEach((checkbox) => {
+      checkbox.checked = false;
+    });
+    updateFilterToggleLabel();
+
+    const selectedServices = [];
+    const openNow = openNowCheckbox.checked;
+    const radius = Number.parseInt(radiusSelect.value, 10) || 0;
+
+    savePreferences({
+      selectedServices,
+      openNow,
+      selectedRadius: radius,
+    });
+    trackStoreLocatorEvent('filter_reset_services', {
+      openNow,
+      radius,
+    });
+    onSearch({
+      type: 'filter',
+      services: selectedServices,
+      openNow,
+      radius,
+    });
+  }, { signal });
+
+  updateFilterToggleLabel();
 
   controlsRow.appendChild(filterSection);
   section.appendChild(form);
@@ -1726,6 +1814,10 @@ function createSearchSection(
   }, { signal });
 
   filterWrapper.addEventListener('change', () => {
+    updateFilterToggleLabel();
+  }, { signal });
+
+  openNowCheckbox.addEventListener('change', () => {
     const selectedServices = Array.from(filterWrapper.querySelectorAll('.service-checkbox:checked'))
       .map((cb) => cb.value);
     const openNow = openNowCheckbox.checked;
@@ -1946,9 +2038,9 @@ function createInfoWindowContent(store, uiConfig = {}) {
   const hiddenTagCount = Math.max(0, supplementaryItems.length - visibleTags.length);
   const tagsHTML = visibleTags.length > 0
     ? `
-      <div class="info-supplementary-tags">
-        ${visibleTags.map((item) => `<span class="info-tag">${escapeHtml(formatLabel(item))}</span>`).join('')}
-        ${hiddenTagCount > 0 ? `<span class="info-tag info-tag-more">+${hiddenTagCount} more</span>` : ''}
+      <div class="info-supplementary-tags info-card-services">
+        ${visibleTags.map((item) => `<span class="card-service-tag">${escapeHtml(formatLabel(item))}</span>`).join('')}
+        ${hiddenTagCount > 0 ? `<span class="card-service-tag card-service-more">+${hiddenTagCount} more</span>` : ''}
       </div>
     `
     : '';
@@ -1990,8 +2082,8 @@ function createInfoWindowContent(store, uiConfig = {}) {
 
   const moreDetailsHTML = detailSections.length > 0
     ? `
-      <details class="info-more-details">
-        <summary>Details & reviews</summary>
+      <details class="info-more-details card-more-details">
+        <summary><span>Details & reviews</span><span class="info-more-chevron" aria-hidden="true">▾</span></summary>
         <div class="info-more-content">
           ${detailSections.join('')}
         </div>
@@ -2625,32 +2717,21 @@ export default async function decorate(block) {
   const mapContainer = document.createElement('div');
   mapContainer.classList.add('store-map');
 
-  const appliedFiltersRow = document.createElement('div');
-  appliedFiltersRow.classList.add('applied-filters-row');
-  appliedFiltersRow.hidden = true;
-
-  const appliedFilters = document.createElement('div');
-  appliedFilters.classList.add('applied-filters');
-  appliedFiltersRow.appendChild(appliedFilters);
-
-  const clearAllFiltersBtn = document.createElement('button');
-  clearAllFiltersBtn.type = 'button';
-  clearAllFiltersBtn.classList.add('clear-filters-btn');
-  clearAllFiltersBtn.textContent = 'Clear all';
-  clearAllFiltersBtn.hidden = true;
-  appliedFiltersRow.appendChild(clearAllFiltersBtn);
-
   const resultsSummary = document.createElement('p');
   resultsSummary.classList.add('store-results-summary');
   resultsSummary.setAttribute('aria-live', 'polite');
   resultsSummary.hidden = true;
 
   let contentArea = null;
+  let searchSectionEl = null;
 
   function setView(view) {
     if (!contentArea) return;
     const normalizedView = ['list', 'map', 'split'].includes(view) ? view : 'split';
     contentArea.setAttribute('data-view', normalizedView);
+    if (searchSectionEl) {
+      searchSectionEl.setAttribute('data-view', normalizedView);
+    }
     const toggleButtons = container.querySelectorAll('.view-toggle-btn');
     toggleButtons.forEach((btn) => {
       btn.classList.toggle('is-active', btn.dataset.view === normalizedView);
@@ -2686,25 +2767,6 @@ export default async function decorate(block) {
     }
     resultsSummary.textContent = summaryParts.join(' · ');
     resultsSummary.hidden = false;
-
-    appliedFilters.innerHTML = '';
-    const chips = [];
-    if (openNow) chips.push({ type: 'open', label: 'Open now' });
-    if (radius > 0) chips.push({ type: 'radius', label: `${radius} ${config.units === 'km' ? 'km' : 'mi'}` });
-    services.forEach((service) => chips.push({ type: 'service', value: service, label: service }));
-    chips.forEach((chip) => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.classList.add('applied-filter-chip');
-      button.dataset.chipType = chip.type;
-      if (chip.value) {
-        button.dataset.chipValue = chip.value;
-      }
-      button.textContent = `${chip.label} ×`;
-      appliedFilters.appendChild(button);
-    });
-    clearAllFiltersBtn.hidden = chips.length === 0;
-    appliedFiltersRow.hidden = chips.length === 0;
   }
 
   /**
@@ -2964,7 +3026,7 @@ export default async function decorate(block) {
   }
 
   // Search header (with dynamic services from actual data)
-  const searchSection = createSearchSection(
+  searchSectionEl = createSearchSection(
     config,
     availableServices,
     handleSearch,
@@ -2973,9 +3035,8 @@ export default async function decorate(block) {
     googleMapsReadyPromise,
     signal,
   );
-  searchSection.appendChild(appliedFiltersRow);
-  searchSection.appendChild(resultsSummary);
-  container.appendChild(searchSection);
+  searchSectionEl.appendChild(resultsSummary);
+  container.appendChild(searchSectionEl);
 
   // Main content area
   contentArea = document.createElement('div');
@@ -2990,61 +3051,28 @@ export default async function decorate(block) {
   const preferredView = prefs.preferredView || mobileDefaultView || config.defaultView || 'split';
   setView(preferredView);
 
-  appliedFilters.addEventListener('click', (event) => {
-    const chip = event.target.closest('.applied-filter-chip');
-    if (!chip) return;
+  // Compact toolbar mode on scroll (desktop/tablet)
+  let compactTicking = false;
+  const updateCompactToolbar = () => {
+    if (!searchSectionEl) return;
+    const isWideViewport = window.matchMedia('(min-width: 1024px)').matches;
+    const compactThreshold = searchSectionEl.offsetTop + 24;
+    const shouldCompact = isWideViewport && window.scrollY > compactThreshold;
+    searchSectionEl.classList.toggle('is-compact', shouldCompact);
+  };
 
-    const { chipType } = chip.dataset;
-    if (chipType === 'open') {
-      const checkbox = container.querySelector('.open-now-checkbox');
-      if (checkbox) checkbox.checked = false;
-    } else if (chipType === 'radius') {
-      const radiusSelect = container.querySelector('#radius-select');
-      if (radiusSelect) radiusSelect.value = '0';
-    } else if (chipType === 'service') {
-      const checkbox = container.querySelector(`.service-checkbox[value="${chip.dataset.chipValue}"]`);
-      if (checkbox) checkbox.checked = false;
-    }
+  const onCompactToolbarScroll = () => {
+    if (compactTicking) return;
+    compactTicking = true;
+    window.requestAnimationFrame(() => {
+      updateCompactToolbar();
+      compactTicking = false;
+    });
+  };
 
-    const { services, openNow, radius } = getSelectedFilters();
-    savePreferences({
-      selectedServices: services,
-      openNow,
-      selectedRadius: radius,
-    });
-    trackStoreLocatorEvent('filter_chip_remove', {
-      chipType,
-      services: services.join(','),
-      openNow,
-      radius,
-    });
-    handleSearch({
-      type: 'filter',
-      services,
-      openNow,
-      radius,
-    });
-  });
-
-  clearAllFiltersBtn.addEventListener('click', () => {
-    container.querySelectorAll('.service-checkbox').forEach((checkbox) => { checkbox.checked = false; });
-    const openNowCheckbox = container.querySelector('.open-now-checkbox');
-    if (openNowCheckbox) openNowCheckbox.checked = false;
-    const radiusSelect = container.querySelector('#radius-select');
-    if (radiusSelect) radiusSelect.value = '0';
-    savePreferences({
-      selectedServices: [],
-      openNow: false,
-      selectedRadius: 0,
-    });
-    trackStoreLocatorEvent('clear_all_filters');
-    handleSearch({
-      type: 'filter',
-      services: [],
-      openNow: false,
-      radius: 0,
-    });
-  });
+  window.addEventListener('scroll', onCompactToolbarScroll, { passive: true, signal });
+  window.addEventListener('resize', onCompactToolbarScroll, { passive: true, signal });
+  updateCompactToolbar();
 
   // Replace block content
   block.innerHTML = '';
