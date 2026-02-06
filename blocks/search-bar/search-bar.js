@@ -1,5 +1,26 @@
 import { getProductLink, rootLink, fetchPlaceholders } from '../../scripts/commerce.js';
 
+const SEARCH_SCOPE = 'search-bar-block';
+const MIN_QUERY_LENGTH = 3;
+const DEFAULT_RESULT_COUNT = 8;
+const MIN_RESULT_COUNT = 2;
+const MAX_RESULT_COUNT = 20;
+let searchBarInstanceCounter = 0;
+
+function getUniqueId(prefix) {
+  if (window.crypto?.randomUUID) {
+    return `${prefix}-${window.crypto.randomUUID()}`;
+  }
+  searchBarInstanceCounter += 1;
+  return `${prefix}-${searchBarInstanceCounter}`;
+}
+
+function sanitizeResultCount(value) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return DEFAULT_RESULT_COUNT;
+  return Math.min(MAX_RESULT_COUNT, Math.max(MIN_RESULT_COUNT, parsed));
+}
+
 /**
  * Parse block configuration from DA.live
  */
@@ -22,7 +43,7 @@ function parseBlockConfig(block) {
   if (validPositions.includes(row1Value)) {
     // New config: row[1] is position
     position = row1Value;
-    resultCount = parseInt(rows[2]?.textContent.trim() || '8', 10);
+    resultCount = sanitizeResultCount(rows[2]?.textContent.trim());
   } else {
     // Old config: row[1] is width, row[2] is position
     position = rows[2]?.textContent.trim() || 'center';
@@ -30,7 +51,7 @@ function parseBlockConfig(block) {
     if (!validPositions.includes(position)) {
       position = 'center';
     }
-    resultCount = parseInt(rows[3]?.textContent.trim() || '8', 10);
+    resultCount = sanitizeResultCount(rows[3]?.textContent.trim());
   }
 
   return {
@@ -46,6 +67,9 @@ function parseBlockConfig(block) {
  */
 export default async function decorate(block) {
   const config = parseBlockConfig(block);
+  const eventsController = new AbortController();
+  const { signal } = eventsController;
+  const resultsId = getUniqueId('search-results');
 
   // Create search bar container
   const searchBarContainer = document.createElement('div');
@@ -60,7 +84,7 @@ export default async function decorate(block) {
   const form = document.createElement('form');
   form.classList.add('search-bar-form');
   form.setAttribute('role', 'search');
-  form.setAttribute('aria-controls', 'search-results');
+  form.setAttribute('aria-controls', resultsId);
 
   // Add search icon button
   const searchIconButton = document.createElement('button');
@@ -80,11 +104,10 @@ export default async function decorate(block) {
   // Create results container
   const resultsDiv = document.createElement('div');
   resultsDiv.classList.add('search-bar-results');
-  resultsDiv.setAttribute('id', 'search-results');
+  resultsDiv.setAttribute('id', resultsId);
   resultsDiv.setAttribute('role', 'region');
   resultsDiv.setAttribute('aria-label', 'Search results');
   resultsDiv.setAttribute('aria-hidden', 'true');
-  resultsDiv.style.display = 'none';
 
   // Create live region for screen reader announcements
   const liveRegion = document.createElement('div');
@@ -113,6 +136,22 @@ export default async function decorate(block) {
 
   // Fetch labels
   const labels = await fetchPlaceholders();
+  const uiText = {
+    search: labels.Global?.Search || 'Search',
+    searchResults: labels.Global?.SearchResults || 'Search results',
+    searchViewAll: labels.Global?.SearchViewAll || 'View All Results',
+    resultFound: labels.Global?.SearchResultFound || 'result found',
+    resultsFound: labels.Global?.SearchResultsFound || 'results found',
+    resultsClosed: labels.Global?.SearchResultsClosed || 'Search results closed',
+  };
+  searchIconButton.setAttribute('aria-label', uiText.search);
+  resultsDiv.setAttribute('aria-label', uiText.searchResults);
+
+  const setResultsOpen = (isOpen) => {
+    resultsDiv.classList.toggle('is-open', isOpen);
+    resultsDiv.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+    searchBarContainer.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  };
 
   // Render SearchResults component
   render.render(SearchResults, {
@@ -121,15 +160,11 @@ export default async function decorate(block) {
     routeProduct: ({ urlKey, sku }) => getProductLink(urlKey, sku),
     onSearchResult: (results) => {
       const hasResults = results.length > 0;
-      resultsDiv.style.display = hasResults ? 'block' : 'none';
-
-      // Update ARIA states
-      resultsDiv.setAttribute('aria-hidden', hasResults ? 'false' : 'true');
-      searchBarContainer.setAttribute('aria-expanded', hasResults ? 'true' : 'false');
+      setResultsOpen(hasResults);
 
       // Announce results to screen readers
       if (hasResults) {
-        liveRegion.textContent = `${results.length} ${results.length === 1 ? 'result' : 'results'} found`;
+        liveRegion.textContent = `${results.length} ${results.length === 1 ? uiText.resultFound : uiText.resultsFound}`;
       } else {
         liveRegion.textContent = '';
       }
@@ -141,7 +176,7 @@ export default async function decorate(block) {
         viewAllResultsWrapper.classList.add('search-bar-view-all');
 
         const viewAllResultsButton = await UI.render(Button, {
-          children: labels.Global?.SearchViewAll || 'View All Results',
+          children: uiText.searchViewAll,
           variant: 'secondary',
           href: rootLink('/search'),
         })(viewAllResultsWrapper);
@@ -161,35 +196,31 @@ export default async function decorate(block) {
   // Handle form submission
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    const query = e.target.search.value;
-    if (query.length) {
+    const query = e.target?.search?.value?.trim() || '';
+    if (query.length > 0) {
       window.location.href = `${rootLink('/search')}?q=${encodeURIComponent(query)}`;
     }
-  });
-
-  // Track the last search phrase for re-triggering
-  let lastSearchPhrase = ''; // eslint-disable-line no-unused-vars
+  }, { signal });
 
   // Function to trigger search
   const performSearch = (phrase) => {
     if (!phrase) {
-      search(null, { scope: 'search-bar-block' });
-      lastSearchPhrase = '';
+      search(null, { scope: SEARCH_SCOPE });
+      setResultsOpen(false);
       return;
     }
 
-    if (phrase.length < 3) {
+    if (phrase.length < MIN_QUERY_LENGTH) {
       return;
     }
 
-    lastSearchPhrase = phrase;
     search({
       phrase,
       pageSize: config.resultCount,
       filter: [
         { attribute: 'visibility', in: ['Search', 'Catalog, Search'] },
       ],
-    }, { scope: 'search-bar-block' });
+    }, { scope: SEARCH_SCOPE });
   };
 
   // Render search input into wrapper
@@ -212,24 +243,22 @@ export default async function decorate(block) {
   form.addEventListener('focusin', (e) => {
     if (e.target.tagName === 'INPUT') {
       const currentValue = e.target.value.trim();
-      // If there's a valid search term (3+ chars) and results are hidden, re-trigger search
-      if (currentValue && currentValue.length >= 3 && resultsDiv.style.display === 'none') {
+      // If there's a valid search term and results are hidden, re-trigger search
+      if (currentValue
+        && currentValue.length >= MIN_QUERY_LENGTH
+        && !resultsDiv.classList.contains('is-open')) {
         performSearch(currentValue);
         // Note: ARIA states will be updated by onSearchResult callback
       }
     }
-  });
+  }, { signal });
 
   // Close results when clicking outside the search bar
   const handleClickOutside = (e) => {
     // Check if click is outside the search bar container
-    if (!searchBarContainer.contains(e.target) && resultsDiv.style.display === 'block') {
-      resultsDiv.style.display = 'none';
-
-      // Update ARIA states
-      resultsDiv.setAttribute('aria-hidden', 'true');
-      searchBarContainer.setAttribute('aria-expanded', 'false');
-      liveRegion.textContent = 'Search results closed';
+    if (!searchBarContainer.contains(e.target) && resultsDiv.classList.contains('is-open')) {
+      setResultsOpen(false);
+      liveRegion.textContent = uiText.resultsClosed;
 
       // Force blur on any input inside the form
       setTimeout(() => {
@@ -245,17 +274,13 @@ export default async function decorate(block) {
     }
   };
 
-  document.addEventListener('click', handleClickOutside);
+  document.addEventListener('click', handleClickOutside, { signal });
 
   // Close results when pressing ESC key
   const handleEscKey = (e) => {
-    if (e.key === 'Escape' && resultsDiv.style.display === 'block') {
-      resultsDiv.style.display = 'none';
-
-      // Update ARIA states
-      resultsDiv.setAttribute('aria-hidden', 'true');
-      searchBarContainer.setAttribute('aria-expanded', 'false');
-      liveRegion.textContent = 'Search results closed';
+    if (e.key === 'Escape' && resultsDiv.classList.contains('is-open')) {
+      setResultsOpen(false);
+      liveRegion.textContent = uiText.resultsClosed;
 
       // Blur the input field
       const input = form.querySelector('input');
@@ -270,5 +295,13 @@ export default async function decorate(block) {
     }
   };
 
-  document.addEventListener('keydown', handleEscKey);
+  document.addEventListener('keydown', handleEscKey, { signal });
+
+  const observer = new MutationObserver(() => {
+    if (!document.body.contains(block)) {
+      eventsController.abort();
+      observer.disconnect();
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
 }
