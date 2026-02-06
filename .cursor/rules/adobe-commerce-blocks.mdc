@@ -1,0 +1,397 @@
+---
+description: Adobe Commerce Storefront block development patterns and DA.live integration
+globs: blocks/**/*.{js,css,md}
+alwaysApply: false
+---
+
+# Adobe Commerce Storefront Block Development
+
+This rule enforces patterns for developing blocks compatible with Adobe Commerce Storefront (Edge Delivery Services) and DA.live authoring.
+
+**Reference Documentation**: [Adobe Commerce Storefront - Get Started](https://experienceleague.adobe.com/developer/commerce/storefront/get-started/)
+
+For architecture, best practices, and detailed guides, always consult the official Adobe Commerce Storefront documentation.
+
+## Block Structure
+
+Every block must have:
+- `block-name.js` - Block logic
+- `block-name.css` - Block styles
+- `README.md` - Documentation
+- `_block-name.json` - DA.live configuration
+
+## DA.live Section Metadata Integration
+
+### Double-Prefix Pattern
+
+DA.live adds **double `data-` prefixes** to section metadata attributes:
+
+```javascript
+// ❌ WRONG - This won't work
+const config = {
+  align: section?.dataset.align,  // undefined
+};
+
+// ✅ CORRECT - Read from double-prefixed attributes
+const config = {
+  align: block.dataset.align 
+    || section?.dataset.dataAlign  // from data-data-align
+    || 'right',
+};
+```
+
+### Configuration Merging Pattern
+
+Always support configuration from both block-level and section-level:
+
+```javascript
+export default function decorate(block) {
+  const section = block.closest('.section');
+  
+  // Read from block first, then section (with double prefix), then defaults
+  const config = {
+    align: block.dataset.align || section?.dataset.dataAlign || 'right',
+    size: block.dataset.size || section?.dataset.dataSize || 'medium',
+    // Handle DA.live typos gracefully
+    intensity: block.dataset.gradientIntensity 
+      || section?.dataset.dataGradientIntensity
+      || section?.dataset.dataGradientIntesity  // common typo
+      || 'medium',
+  };
+  
+  // Apply to block for CSS selectors
+  Object.entries(config).forEach(([key, value]) => {
+    block.dataset[key] = value;
+  });
+}
+```
+
+### Normalization Functions
+
+Create validation functions for data attributes:
+
+```javascript
+function normalizeAlign(value, fallback) {
+  const val = (value || '').toLowerCase();
+  if (['left', 'center', 'right'].includes(val)) return val;
+  return fallback;
+}
+
+// Usage
+const config = {
+  align: normalizeAlign(
+    block.dataset.align || section?.dataset.dataAlign,
+    'right'
+  ),
+};
+```
+
+## CSS Patterns
+
+### Data Attribute Selectors
+
+Use data attributes for variants, not classes:
+
+```css
+/* ✅ GOOD - Data attributes for configuration */
+.hero-cta[data-align='center'] .hero-content {
+  text-align: center;
+}
+
+.hero-cta[data-size='tall'] {
+  min-height: 640px;
+}
+
+/* ❌ BAD - Avoid hardcoded variant classes */
+.hero-cta.center {
+  text-align: center;
+}
+```
+
+### Design Tokens
+
+Always use CSS custom properties from the design system:
+
+```css
+/* ✅ GOOD - Use design tokens */
+.button {
+  background-color: var(--color-brand-primary);
+  border-radius: var(--shape-border-radius-2);
+  padding: var(--spacing-3) var(--spacing-4);
+}
+
+/* ❌ BAD - Hardcoded values */
+.button {
+  background-color: #007bff;
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+```
+
+### Specificity Ordering
+
+Keep selectors ordered from **low to high specificity** to pass stylelint:
+
+```css
+/* ✅ CORRECT ORDER */
+.hero-content {
+  max-width: 420px;
+}
+
+.hero[data-loading] .hero-content {
+  opacity: 0.3;
+}
+
+/* Base alignment */
+.hero[data-align='left'] .hero-overlay::before {
+  background: linear-gradient(90deg, rgb(0 0 0 / 60%) 0%, rgb(0 0 0 / 0%) 60%);
+}
+
+/* Alignment variants (higher specificity) */
+.hero[data-align='left'][data-gradient-intensity='light'] .hero-overlay::before {
+  background: linear-gradient(90deg, rgb(0 0 0 / 30%) 0%, rgb(0 0 0 / 0%) 60%);
+}
+```
+
+### Modern Color Notation
+
+Use modern `rgb()` syntax with percentage alpha:
+
+```css
+/* ✅ GOOD - Modern notation */
+background: rgb(0 0 0 / 55%);
+
+/* ❌ BAD - Old notation */
+background: rgba(0, 0, 0, 0.55);
+```
+
+## JavaScript Patterns
+
+### Image Optimization
+
+Always use `createOptimizedPicture` with appropriate settings:
+
+```javascript
+import { createOptimizedPicture } from '../../scripts/aem.js';
+
+// Eager loading for first/hero images
+const picture = createOptimizedPicture(
+  imageUrl,
+  alt,
+  isFirstSlide,  // true = eager loading for LCP
+  [
+    { media: '(min-width: 600px)', width: config.imageMaxWidth },
+    { width: '750' },
+  ],
+);
+```
+
+### Accessibility Requirements
+
+1. **Keyboard navigation** for interactive elements
+2. **ARIA attributes** for semantic meaning
+3. **Reduced motion** support
+4. **Color contrast** validation for custom colors
+
+```javascript
+// ARIA attributes
+button.setAttribute('aria-label', `${buttonText} - opens in current tab`);
+button.setAttribute('role', 'button');
+
+// WCAG color contrast validation
+function validateContrast(bgColor, textColor = '#ffffff') {
+  const ratio = calculateContrastRatio(bgColor, textColor);
+  if (ratio < 4.5) {
+    console.warn(`Low contrast ratio ${ratio.toFixed(2)}:1 for ${bgColor}`);
+  }
+}
+
+// Reduced motion CSS
+@media (prefers-reduced-motion: reduce) {
+  .hero-slide {
+    transition: none;
+  }
+}
+```
+
+### Loading States
+
+Implement skeleton loading for better perceived performance:
+
+```javascript
+// Set loading state
+block.dataset.loading = 'true';
+
+// Remove on image load
+picture.addEventListener('load', () => {
+  delete block.dataset.loading;
+});
+
+// Timeout fallback
+setTimeout(() => {
+  delete block.dataset.loading;
+}, 3000);
+```
+
+## README Documentation
+
+Every block README must include:
+
+1. **Overview** - What the block does
+2. **Integration** - How to use in DA.live (table structure, section metadata)
+3. **Configuration Options** - All data attributes with examples
+4. **Behavior Patterns** - How it responds to different settings
+5. **Accessibility** - A11y features
+6. **Troubleshooting** - Common issues and fixes
+
+Example section metadata documentation:
+
+```markdown
+## Configuration via Section Metadata
+
+Add a Section Metadata table **immediately before** your block:
+
+| Section Metadata | |
+|-----------------|---|
+| data-align      | center |
+| data-size       | tall |
+| data-button-width | wide |
+
+**Important**: Section Metadata must be directly above the block (no other content between).
+```
+
+## Linting Standards
+
+All code must pass:
+- **ESLint** for JavaScript
+- **Stylelint** for CSS
+
+```bash
+npm run lint        # Run both linters
+npm run lint:js     # JavaScript only
+npm run lint:css    # CSS only
+```
+
+Common fixes:
+- Use `// eslint-disable-next-line` for necessary exceptions (e.g., bitwise operators)
+- Keep lines under 100 characters
+- Use single quotes in JS
+- Add trailing commas
+- Remove trailing spaces
+
+## Block Behavior
+
+- **Progressive enhancement** - Works without JavaScript
+- **Responsive** - Mobile-first design
+- **Performance** - Optimize for Core Web Vitals
+- **Separation of concerns** - Content (HTML), Presentation (CSS), Behavior (JS)
+
+---
+
+## HTML & Semantics
+
+- **Semantic elements**: Prefer `<button>` for actions, `<a>` for navigation; use `<section>`, `<article>`, `<nav>` where appropriate. Avoid interactive `<div>` when a native element exists.
+- **Heading hierarchy**: One `<h1>` per block or page; don’t skip levels (`h2` → `h4`).
+- **Links**: Use `rel="noopener noreferrer"` with `target="_blank"`. Never use `javascript:` URLs.
+- **Images**: Always set meaningful `alt` (empty `alt=""` only for purely decorative images).
+
+```html
+<!-- ✅ GOOD -->
+<button type="button" aria-label="Close">×</button>
+<a href="/page" rel="noopener noreferrer" target="_blank">External</a>
+<img src="..." alt="Product hero" loading="lazy" />
+
+<!-- ❌ BAD -->
+<div role="button" onclick="...">×</div>
+<a href="javascript:void(0)">Click</a>
+<img src="..." alt="image" />
+```
+
+---
+
+## Security
+
+- **No unsanitized HTML**: Never set `innerHTML` with author or user content unless sanitized. Prefer `textContent` or `createElement` + `append`.
+- **Safe URLs**: Validate or sanitize `href`/`src` from content; reject `javascript:`, `data:` if not required.
+- **External links**: Use `rel="noopener noreferrer"` for `target="_blank"`.
+
+---
+
+## Performance
+
+- **LCP**: Eager-load the first/hero image (`loading="eager"` or `createOptimizedPicture(..., true)`). Lazy-load below-the-fold images.
+- **Plain JS preferred**: Adobe recommends plain JavaScript for blocks without complex state to keep bundles small and Lighthouse scores high. Use Preact/HTM only when state is complex.
+- **Scoped selectors**: Query within the block (`block.querySelector(...)`) to avoid scanning the whole document.
+- **Avoid layout thrash**: Batch DOM reads then writes; don’t interleave reads/writes in loops.
+- **CSS**: Use shorthand properties (per stylelint). Consider `contain: layout paint` for isolated blocks where it helps.
+
+---
+
+## JavaScript Architecture
+
+- **Single default export**: Export one `decorate(block)` function. Block name must match folder (`blocks/my-block/` → `decorate` receives block with class `my-block`).
+- **No global state**: Don’t attach state to `window` or global variables. Keep state in closure or on the block/section element.
+- **Event cleanup**: If adding listeners in `decorate`, prefer one delegated listener on the block, or remove listeners if the block is ever removed/replaced.
+
+```javascript
+// ✅ GOOD - Scoped query, single export
+export default function decorate(block) {
+  const section = block.closest('.section');
+  const links = block.querySelectorAll('a');
+}
+
+// ❌ BAD - Global, document-wide query
+window.myBlockState = {};
+document.querySelectorAll('.my-block a');
+```
+
+---
+
+## Error Handling & Resilience
+
+- **Graceful degradation**: If content or config is missing, render a safe fallback (e.g. hide section or show placeholder), don’t throw.
+- **Authoring feedback**: Use `console.warn` with block name prefix (e.g. `hero-cta: No image source in row 1`) for invalid Section Metadata or table content.
+- **Validate config**: Use normalization functions for every option from Section Metadata; invalid values fall back to a safe default.
+
+```javascript
+// ✅ GOOD
+if (!imageUrl) {
+  console.warn('hero-cta: No valid image in row 1');
+  return;
+}
+
+// ❌ BAD - Silent failure or hard throw
+if (!imageUrl) return;
+if (!imageUrl) throw new Error('No image');
+```
+
+---
+
+## CSS Conventions
+
+- **Block-scoped classes**: Use a single block prefix for all classes (e.g. `.hero-cta-content`, `.hero-cta-actions`). Avoid generic names like `.content` or `.button` without the block prefix.
+- **No redundant shorthand**: Use 3-value shorthand when the fourth would repeat (e.g. `padding: 48px 48px 80px` not `48px 48px 80px 48px`).
+- **Avoid !important**: Override via specificity or data attributes instead. Use `!important` only for rare utility overrides and add a comment.
+- **Focus visible**: Always style `:focus-visible` for keyboard users; don’t remove focus outline without a visible replacement.
+
+```css
+/* ✅ GOOD - Block-scoped, focus style */
+.hero-cta-actions .button:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+
+/* ❌ BAD */
+.button:focus {
+  outline: none;
+}
+```
+
+---
+
+## Before Shipping
+
+1. Run `npm run lint` and fix all ESLint and Stylelint errors.
+2. Test with Section Metadata: set options in the table above the block and confirm they apply (including double-prefix).
+3. Test with JS disabled: critical content and links should still work.
+4. Check one representative mobile and desktop viewport for layout and touch targets (min 44×44px for tap targets).
