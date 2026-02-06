@@ -65,17 +65,13 @@
           "valueType": "string",
           "name": "mapProvider",
           "label": "Map Provider",
-          "description": "Which mapping service to use (requires API key)",
+          "description": "Mapping service used by this block",
           "value": "google",
           "required": false,
           "options": [
             {
               "name": "Google Maps",
               "value": "google"
-            },
-            {
-              "name": "OpenStreetMap",
-              "value": "openstreetmap"
             }
           ]
         },
@@ -84,11 +80,11 @@
           "valueType": "number",
           "name": "searchRadius",
           "label": "Search Radius (miles)",
-          "description": "Default search radius from user location",
+          "description": "Radius cap from user location (set 0 for All stores)",
           "value": 25,
           "required": false,
           "validation": {
-            "numberMin": 5,
+            "numberMin": 0,
             "numberMax": 100
           }
         },

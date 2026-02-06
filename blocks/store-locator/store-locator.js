@@ -1,6 +1,13 @@
 /* eslint-disable no-console, no-undef */
 /* Store Locator v2.0 - NEW Places API & Advanced Markers - Pure Implementation */
 
+const DEBUG_STORE_LOCATOR = Boolean(window.DEBUG_STORE_LOCATOR);
+const debugLog = (...args) => {
+  if (DEBUG_STORE_LOCATOR) {
+    console.log(...args);
+  }
+};
+
 /**
  * Parse block configuration from DA.live table rows
  * @param {Element} block - The block element from DA.live
@@ -28,42 +35,60 @@ function parseBlockConfig(block) {
     const cells = [...row.children];
     if (cells.length >= 2) {
       const key = cells[0]?.textContent?.trim();
-      const value = cells[1]?.textContent?.trim();
-
-      if (!key || !value) return;
+      const value = cells[1]?.textContent?.trim() ?? '';
+      if (!key) return;
+      const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
 
       // Map configuration keys from DA.live to config object
-      switch (key) {
-        case 'Google Maps API Key':
+      switch (normalizedKey) {
+        case 'googlemapsapikey':
           config.googleMapsApiKey = value;
-          console.log('📍 Google Maps API Key found:', `${value.substring(0, 20)}...`);
+          debugLog('📍 Google Maps API Key found:', `${value.substring(0, 20)}...`);
           break;
-        case 'Autocomplete Provider':
+        case 'autocompleteprovider':
           config.autocompleteProvider = value.toLowerCase();
-          console.log('🔍 Autocomplete Provider:', value);
+          debugLog('🔍 Autocomplete Provider:', value);
           break;
-        case 'Default View':
+        case 'defaultview':
           config.defaultView = value.toLowerCase();
           break;
-        case 'Map Provider':
+        case 'mapprovider':
           config.mapProvider = value.toLowerCase();
           break;
-        case 'Search Radius':
-          config.searchRadius = parseInt(value, 10) || 25;
+        case 'datasource':
+          config.dataSource = value.toLowerCase();
           break;
-        case 'Max Results':
+        case 'searchradius':
+        case 'searchradiusmiles':
+          // 0 or blank means "All" (no radius cap)
+          if (value === '') {
+            config.searchRadius = 0;
+          } else {
+            const parsedRadius = Number.parseInt(value, 10);
+            config.searchRadius = Number.isNaN(parsedRadius) ? 25 : parsedRadius;
+          }
+          break;
+        case 'maxresults':
+        case 'maximumresults':
           config.maxResults = parseInt(value, 10) || 10;
           break;
-        case 'Auto Detect Location':
+        case 'autodetectlocation':
           config.autoDetect = value.toLowerCase() !== 'false';
           break;
-        case 'Show Distance':
+        case 'showdistance':
           config.showDistance = value.toLowerCase() !== 'false';
           break;
-        case 'Default Location':
+        case 'defaultlocation':
           config.defaultLocation = value;
           break;
-        case 'Zoom Level':
+        case 'servicesfilter':
+        case 'availableservicefilters':
+          config.servicesFilter = value
+            .split(',')
+            .map((service) => service.trim().toLowerCase())
+            .filter(Boolean);
+          break;
+        case 'zoomlevel':
           config.zoomLevel = parseInt(value, 10) || 11;
           break;
         default:
@@ -84,7 +109,7 @@ function parseBlockConfig(block) {
 async function loadGoogleMaps(apiKey) {
   // If Google Maps is already loaded, return immediately
   if (window.google?.maps) {
-    console.log('✅ Google Maps already loaded');
+    debugLog('✅ Google Maps already loaded');
     return true;
   }
 
@@ -94,7 +119,7 @@ async function loadGoogleMaps(apiKey) {
     return false;
   }
 
-  console.log('📍 Loading Google Maps API (NEW - requires "Places API (New)" enabled)...');
+  debugLog('📍 Loading Google Maps API (NEW - requires "Places API (New)" enabled)...');
 
   return new Promise((resolve, reject) => {
     const script = document.createElement('script');
@@ -104,8 +129,8 @@ async function loadGoogleMaps(apiKey) {
         // Dynamically import libraries using the NEW importLibrary method
         await google.maps.importLibrary('places');
         await google.maps.importLibrary('marker');
-        console.log('✅ Google Maps API loaded with NEW Places & Marker libraries');
-        console.log(`   Version: ${google.maps.version}`);
+        debugLog('✅ Google Maps API loaded with NEW Places & Marker libraries');
+        debugLog(`   Version: ${google.maps.version}`);
         resolve(true);
       } catch (error) {
         console.error('❌ Failed to load Google Maps libraries:', error);
@@ -166,10 +191,10 @@ async function getUserLocation() {
       reject(new Error('Geolocation not supported'));
       return;
     }
-    console.log('🌍 Requesting user location...');
+    debugLog('🌍 Requesting user location...');
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        console.log('✅ User location obtained:', position.coords.latitude, position.coords.longitude);
+        debugLog('✅ User location obtained:', position.coords.latitude, position.coords.longitude);
         resolve({
           lat: position.coords.latitude,
           lng: position.coords.longitude,
@@ -193,7 +218,7 @@ async function geocodeAddress(address) {
   try {
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`;
 
-    console.log('Geocoding address:', address);
+    debugLog('Geocoding address:', address);
 
     const response = await fetch(url, {
       headers: {
@@ -212,7 +237,7 @@ async function geocodeAddress(address) {
         lat: parseFloat(data[0].lat),
         lng: parseFloat(data[0].lon),
       };
-      console.log('Geocoded coordinates:', coords);
+      debugLog('Geocoded coordinates:', coords);
       return coords;
     }
     throw new Error('No results found for address');
@@ -291,7 +316,7 @@ function parseStoresFromBlock(block) {
     if (firstCell.toLowerCase().includes('place')
         || firstCell.toLowerCase() === 'name') {
       dataStartIndex = i;
-      console.log(`🔍 Found data section at row ${i}, header: "${firstCell}"`);
+      debugLog(`🔍 Found data section at row ${i}, header: "${firstCell}"`);
       break;
     }
   }
@@ -310,11 +335,11 @@ function parseStoresFromBlock(block) {
   const isPlaceIdFormat = firstHeader.toLowerCase().includes('place');
 
   if (isPlaceIdFormat) {
-    console.log('📍 Detected Place ID format (DA.live with Google Places)');
+    debugLog('📍 Detected Place ID format (DA.live with Google Places)');
     return parseStoresFromPlaceIds(block, dataStartIndex);
   }
 
-  console.log('📍 Detected legacy format (Name, Address, Coordinates...)');
+  debugLog('📍 Detected legacy format (Name, Address, Coordinates...)');
 
   // Legacy format parsing:
   // Row 0 = column headers
@@ -408,7 +433,7 @@ function parseStoresFromBlock(block) {
 
   // Summary log
   const skipMsg = skippedCount > 0 ? `, ${skippedCount} incomplete rows skipped` : '';
-  console.log(`✅ Store Locator: ${stores.length} stores loaded${skipMsg}`);
+  debugLog(`✅ Store Locator: ${stores.length} stores loaded${skipMsg}`);
 
   return { stores };
 }
@@ -486,7 +511,7 @@ function parseStoresFromPlaceIds(block, startIndex = 0) {
 
   // Summary log
   const skipMsg = skippedCount > 0 ? `, ${skippedCount} incomplete rows skipped` : '';
-  console.log(`✅ Store Locator: ${stores.length} stores loaded from Place IDs${skipMsg}`);
+  debugLog(`✅ Store Locator: ${stores.length} stores loaded from Place IDs${skipMsg}`);
 
   return { stores };
 }
@@ -498,7 +523,7 @@ function parseStoresFromPlaceIds(block, startIndex = 0) {
  * @returns {Promise<Object>} Store data
  */
 async function loadStoreData(config, block) {
-  console.log('Loading store data from:', config.dataSource);
+  debugLog('Loading store data from:', config.dataSource);
 
   if (config.dataSource === 'block-content') {
     return parseStoresFromBlock(block);
@@ -673,10 +698,10 @@ function getTodayHours(store) {
 /**
  * Render a single store card (matches info window design)
  * @param {Object} store - Store object
- * @param {boolean} showDistance - Whether to show distance
+ * @param {boolean} [showDistance=true] - Whether to show distance
  * @returns {Element} Store card element
  */
-function renderStoreCard(store) {
+function renderStoreCard(store, showDistance = true) {
   const card = document.createElement('article');
   card.classList.add('store-card');
   card.dataset.storeId = store.id;
@@ -694,7 +719,7 @@ function renderStoreCard(store) {
   topRow.classList.add('card-top-row');
 
   // Distance badge (left side)
-  if (store.distance !== undefined) {
+  if (showDistance && store.distance !== undefined) {
     const distanceBadge = document.createElement('div');
     distanceBadge.classList.add('card-distance-badge');
     distanceBadge.innerHTML = `
@@ -865,6 +890,7 @@ function loadPreferences() {
  * @param {Function} onSearch - Search callback function
  * @param {Function} onSortChange - Sort change callback
  * @param {Promise<boolean>} googleMapsReadyPromise - Resolves when Google Maps is loaded
+ * @param {AbortSignal} signal - Signal for listener cleanup
  * @returns {Element} Search section element
  */
 function createSearchSection(
@@ -873,6 +899,7 @@ function createSearchSection(
   onSearch,
   onSortChange,
   googleMapsReadyPromise,
+  signal,
 ) {
   const section = document.createElement('div');
   section.classList.add('store-locator-search');
@@ -1043,7 +1070,7 @@ function createSearchSection(
     if (googleAutocompleteService) return;
     if (window.google?.maps?.places) {
       googleAutocompleteService = new google.maps.places.AutocompleteService();
-      console.log('🔍 Using Google Places Autocomplete');
+      debugLog('🔍 Using Google Places Autocomplete');
     }
   };
 
@@ -1079,7 +1106,7 @@ function createSearchSection(
       return;
     }
 
-    console.log('🔍 Autocomplete triggered for:', query);
+    debugLog('🔍 Autocomplete triggered for:', query);
 
     autocompleteTimeout = setTimeout(async () => {
       try {
@@ -1115,13 +1142,13 @@ function createSearchSection(
           );
         } else {
           // Use Nominatim (OpenStreetMap) - FREE
-          console.log('🌍 Using Nominatim autocomplete for:', query);
+          debugLog('🌍 Using Nominatim autocomplete for:', query);
           const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`;
           const response = await fetch(url, {
             headers: { 'User-Agent': 'StoreLocator/1.0' },
           });
           const results = await response.json();
-          console.log('✅ Nominatim results:', results.length, 'suggestions');
+          debugLog('✅ Nominatim results:', results.length, 'suggestions');
 
           if (results.length > 0) {
             autocompleteList.innerHTML = '';
@@ -1139,18 +1166,18 @@ function createSearchSection(
               autocompleteList.appendChild(item);
             });
             autocompleteList.classList.add('visible');
-            console.log('👁️ Autocomplete dropdown shown with', results.length, 'items');
+            debugLog('👁️ Autocomplete dropdown shown with', results.length, 'items');
           } else {
             autocompleteList.innerHTML = '';
             autocompleteList.classList.remove('visible');
-            console.log('⚠️ No autocomplete results found');
+            debugLog('⚠️ No autocomplete results found');
           }
         }
       } catch (error) {
         console.error('Autocomplete error:', error);
       }
     }, 300);
-  });
+  }, { signal });
 
   // Close autocomplete on outside click
   document.addEventListener('click', (e) => {
@@ -1158,7 +1185,7 @@ function createSearchSection(
       autocompleteList.innerHTML = '';
       autocompleteList.classList.remove('visible');
     }
-  });
+  }, { signal });
 
   // Event handlers
   form.addEventListener('submit', (e) => {
@@ -1170,16 +1197,16 @@ function createSearchSection(
       autocompleteList.classList.remove('visible');
       onSearch({ type: 'address', value: searchValue });
     }
-  });
+  }, { signal });
 
   locationBtn.addEventListener('click', () => {
     onSearch({ type: 'geolocation' });
-  });
+  }, { signal });
 
   sortSelect.addEventListener('change', (e) => {
     savePreferences({ sortBy: e.target.value });
     onSortChange(e.target.value);
-  });
+  }, { signal });
 
   filterWrapper.addEventListener('change', () => {
     const selectedServices = Array.from(filterWrapper.querySelectorAll('.service-checkbox:checked'))
@@ -1192,7 +1219,7 @@ function createSearchSection(
     });
 
     onSearch({ type: 'filter', services: selectedServices, openNow });
-  });
+  }, { signal });
 
   return section;
 }
@@ -1561,7 +1588,7 @@ async function initializeMap(container, stores, center, zoomLevel) {
       });
     });
 
-    console.log('✅ Map initialized with NEW Advanced Markers');
+    debugLog('✅ Map initialized with NEW Advanced Markers');
     return map;
   } catch (error) {
     console.error('Map initialization error:', error);
@@ -1738,12 +1765,12 @@ async function enrichStoreWithPlacesData(store) {
         directionsUrl: `https://www.google.com/maps/place/?q=place_id:${store.placeId}`,
       };
 
-      console.log(`✅ Enriched store: ${enrichedStore.name} (NEW Places API)`);
-      console.log('  📍 Address:', enrichedStore.address);
-      console.log('  📞 Phone:', enrichedStore.contact.phone || '❌ NOT PROVIDED BY GOOGLE');
-      console.log('  🕒 Hours:', Object.keys(parsedHours).length > 0 ? `✅ ${Object.keys(parsedHours).length} days` : '❌ NOT PROVIDED BY GOOGLE');
-      console.log('  ⭐ Rating:', enrichedStore.rating || '❌ NOT PROVIDED BY GOOGLE');
-      console.log('  📊 Reviews:', enrichedStore.userRatingsTotal || '❌ NOT PROVIDED BY GOOGLE');
+      debugLog(`✅ Enriched store: ${enrichedStore.name} (NEW Places API)`);
+      debugLog('  📍 Address:', enrichedStore.address);
+      debugLog('  📞 Phone:', enrichedStore.contact.phone || '❌ NOT PROVIDED BY GOOGLE');
+      debugLog('  🕒 Hours:', Object.keys(parsedHours).length > 0 ? `✅ ${Object.keys(parsedHours).length} days` : '❌ NOT PROVIDED BY GOOGLE');
+      debugLog('  ⭐ Rating:', enrichedStore.rating || '❌ NOT PROVIDED BY GOOGLE');
+      debugLog('  📊 Reviews:', enrichedStore.userRatingsTotal || '❌ NOT PROVIDED BY GOOGLE');
       return enrichedStore;
     }
     console.warn(`⚠️ Could not enrich store with Place ID ${store.placeId}: No data returned`);
@@ -1764,7 +1791,7 @@ async function enrichStoresWithPlacesData(stores) {
   const storesToEnrich = stores.filter((store) => store.requiresEnrichment);
 
   if (storesToEnrich.length === 0) {
-    console.log('No stores require Places API enrichment');
+    debugLog('No stores require Places API enrichment');
     return stores;
   }
 
@@ -1776,7 +1803,7 @@ async function enrichStoresWithPlacesData(stores) {
     return stores; // Return un-enriched stores
   }
 
-  console.log(`🔄 Enriching ${storesToEnrich.length} stores with NEW Places API...`);
+  debugLog(`🔄 Enriching ${storesToEnrich.length} stores with NEW Places API...`);
 
   const enrichedStores = await Promise.all(
     stores.map((store) => {
@@ -1788,7 +1815,7 @@ async function enrichStoresWithPlacesData(stores) {
   );
 
   const successfulEnrichments = enrichedStores.filter((s) => !s.requiresEnrichment).length;
-  console.log(`✅ Successfully enriched ${successfulEnrichments}/${storesToEnrich.length} stores with NEW Places API`);
+  debugLog(`✅ Successfully enriched ${successfulEnrichments}/${storesToEnrich.length} stores with NEW Places API`);
   return enrichedStores;
 }
 
@@ -1826,6 +1853,14 @@ function hideLoading(spinner) {
  */
 export default async function decorate(block) {
   const config = parseBlockConfig(block);
+  const eventsController = new AbortController();
+  const { signal } = eventsController;
+
+  if (config.mapProvider !== 'google') {
+    console.warn(`Unsupported map provider "${config.mapProvider}". Falling back to "google".`);
+    config.mapProvider = 'google';
+  }
+
   const googleMapsReadyPromise = (config.googleMapsApiKey && config.mapProvider === 'google')
     ? loadGoogleMaps(config.googleMapsApiKey).catch((error) => {
       console.error('Failed to load Google Maps:', error);
@@ -1850,7 +1885,11 @@ export default async function decorate(block) {
   let mapInstance = null;
   let loadingSpinner; // Declared here, assigned later
   // Get available services from actual store data (for dynamic filters)
-  const availableServices = getAvailableServices(allStores);
+  const detectedServices = getAvailableServices(allStores);
+  const configuredServices = Array.isArray(config.servicesFilter) ? config.servicesFilter : [];
+  const availableServices = configuredServices.length > 0
+    ? detectedServices.filter((service) => configuredServices.includes(service))
+    : detectedServices;
 
   // Create UI structure AFTER parsing stores
   const container = document.createElement('div');
@@ -1908,6 +1947,11 @@ export default async function decorate(block) {
   function applyFiltersAndSort(stores, services = [], openNow = false) {
     let processed = filterStores(stores, services, openNow);
     processed = sortStores(processed, currentSort, userLocation);
+    if (userLocation && Number.isFinite(config.searchRadius) && config.searchRadius > 0) {
+      processed = processed.filter((store) => (
+        typeof store.distance === 'number' && store.distance <= config.searchRadius
+      ));
+    }
     return processed.slice(0, config.maxResults);
   }
 
@@ -2012,15 +2056,11 @@ export default async function decorate(block) {
         hideLoading(loadingSpinner);
       }
     } else if (searchData.type === 'filter') {
-      const filtered = filterStores(allStores, searchData.services, searchData.openNow);
-
-      if (userLocation) {
-        filteredStores = sortStores(filtered, currentSort, userLocation);
-      } else {
-        filteredStores = sortStores(filtered, currentSort);
-      }
-
-      filteredStores = filteredStores.slice(0, config.maxResults);
+      filteredStores = applyFiltersAndSort(
+        allStores,
+        searchData.services || [],
+        searchData.openNow || false,
+      );
       renderStores(filteredStores);
 
       // Update map if needed
@@ -2037,6 +2077,7 @@ export default async function decorate(block) {
     handleSearch,
     handleSortChange,
     googleMapsReadyPromise,
+    signal,
   );
   container.appendChild(searchSection);
 
@@ -2070,16 +2111,25 @@ export default async function decorate(block) {
         // Use saved location if available, otherwise request new
         if (prefs.lastLocation && prefs.lastLocation.lat && prefs.lastLocation.lng) {
           userLocation = prefs.lastLocation;
-          console.log('Using saved location:', userLocation);
+          debugLog('Using saved location:', userLocation);
         } else {
-          console.log('🔍 Auto-detecting your location...');
+          debugLog('🔍 Auto-detecting your location...');
           userLocation = await getUserLocation();
           savePreferences({ lastLocation: userLocation });
-          console.log('✅ Location detected:', userLocation);
+          debugLog('✅ Location detected:', userLocation);
         }
       } catch (err) {
         // Silently fall back - user may have denied permission
-        console.log('Geolocation not available, using default view');
+        debugLog('Geolocation not available, using default view');
+      }
+    }
+
+    // Fallback to configured default location if no geolocation available
+    if (!userLocation && config.defaultLocation) {
+      try {
+        userLocation = await geocodeAddress(config.defaultLocation);
+      } catch (error) {
+        console.warn(`Default location geocoding failed for "${config.defaultLocation}"`);
       }
     }
 
@@ -2132,7 +2182,7 @@ export default async function decorate(block) {
       // No API key provided - show helpful message
       const fallback = { lat: 45.5231, lng: -122.6765 };
       const mapCenter = userLocation || filteredStores[0]?.address.coordinates || fallback;
-      mapInstance = initializeMap(mapContainer, filteredStores, mapCenter, config.zoomLevel);
+      mapInstance = await initializeMap(mapContainer, filteredStores, mapCenter, config.zoomLevel);
     }
   } catch (error) {
     console.error('Store locator error:', error);
@@ -2148,4 +2198,12 @@ export default async function decorate(block) {
     listContainer.insertBefore(errorMsg, loadingSpinner);
     hideLoading(loadingSpinner);
   }
+
+  const observer = new MutationObserver(() => {
+    if (!document.body.contains(block)) {
+      eventsController.abort();
+      observer.disconnect();
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
 }

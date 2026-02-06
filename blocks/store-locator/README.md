@@ -53,12 +53,13 @@ ChIJ... | true | pickup, click&collect, pharmacy | 3 |
 | Google Maps API Key | text | empty | Required for map + Places enrichment |
 | Autocomplete Provider | select | `nominatim` | `nominatim` or `google` |
 | Default View | select | `split` | `split`, `map`, `list` |
-| Map Provider | select | `google` | `google` or `openstreetmap` |
-| Search Radius | number | `25` | Default radius in miles |
+| Map Provider | select | `google` | `google` |
+| Search Radius | number | `25` | Radius cap in miles when a location is known (`0` or blank = all stores) |
 | Max Results | number | `10` | Max stores shown |
 | Auto Detect Location | boolean | `true` | Use browser geolocation |
 | Show Distance | boolean | `true` | Show miles on cards |
-| Default Location | text | `Portland, OR` | Fallback when geolocation fails |
+| Default Location | text | `Portland, OR` | Geocoded fallback when geolocation is unavailable |
+| Services Filter | text | empty | Optional comma-separated allowlist for filter chips |
 | Zoom Level | number | `11` | Initial map zoom |
 
 > **Important:** Row labels must match exactly (case and spacing), e.g. `Autocomplete Provider`.

@@ -14,6 +14,14 @@
 /* ============================================
    DESIGN TOKENS - UNIFIED SYSTEM
    ============================================ */
+
+/* Franklin wrapper must stretch for full/wide section metadata to take effect */
+.store-locator-container .store-locator-wrapper {
+  display: block;
+  width: 100%;
+  max-width: none;
+}
+
 .store-locator {
   /* Standard block pattern - inherit wrapper width constraints */
   width: 100%;
@@ -72,6 +80,16 @@
   --sl-transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   --sl-transition-base: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   --sl-transition-slow: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Ensure the block itself never shrink-wraps in any template mode */
+.store-locator.block,
+.store-locator.block.store-locator,
+main > .section.store-locator-container[data-width="wide"] .store-locator.block,
+main > .section.store-locator-container[data-width="full"] .store-locator.block {
+  display: block;
+  width: 100%;
+  max-width: none;
 }
 
 .store-locator-container {
@@ -968,7 +986,7 @@ a.btn-primary {
   background: #1a73e8 !important;
   color: #fff !important;
   border: none;
-  border-radius: 0 0 7px 7px;
+  border-radius: var(--sl-radius-sm);
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
