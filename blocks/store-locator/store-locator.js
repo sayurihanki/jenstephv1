@@ -246,6 +246,30 @@ function mapWithConcurrency(items, limit, mapper) {
   });
 }
 
+function hasValidCoordinates(store = {}) {
+  const lat = store.address?.coordinates?.lat;
+  const lng = store.address?.coordinates?.lng;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+  if (lat === 0 && lng === 0) return false;
+  return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+}
+
+function clearPlaceDetailsCache() {
+  placeDetailsCache.clear();
+  try {
+    const keysToRemove = [];
+    for (let i = 0; i < sessionStorage.length; i += 1) {
+      const key = sessionStorage.key(i);
+      if (key && key.startsWith('storeLocator.place.')) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((key) => sessionStorage.removeItem(key));
+  } catch (e) {
+    // ignore storage access errors
+  }
+}
+
 /**
  * Parse block configuration from DA.live table rows
  * @param {Element} block - The block element from DA.live
@@ -925,12 +949,14 @@ function sortStores(stores, sortBy, userLocation = null) {
   if (userLocation) {
     sorted = sorted.map((store) => ({
       ...store,
-      distance: calculateDistance(
-        userLocation.lat,
-        userLocation.lng,
-        store.address.coordinates.lat,
-        store.address.coordinates.lng,
-      ),
+      distance: hasValidCoordinates(store)
+        ? calculateDistance(
+          userLocation.lat,
+          userLocation.lng,
+          store.address.coordinates.lat,
+          store.address.coordinates.lng,
+        )
+        : undefined,
     }));
   }
 
@@ -1430,6 +1456,11 @@ function createSearchSection(
   title.textContent = 'Find Your Nearest Store';
   section.appendChild(title);
 
+  const subtitle = document.createElement('p');
+  subtitle.classList.add('store-locator-subtitle');
+  subtitle.textContent = 'Search by ZIP, city, or full address and refine by distance or services.';
+  section.appendChild(subtitle);
+
   // Search form
   const form = document.createElement('form');
   form.classList.add('store-search-form');
@@ -1465,12 +1496,22 @@ function createSearchSection(
   const searchBtn = document.createElement('button');
   searchBtn.type = 'submit';
   searchBtn.classList.add('btn-search');
-  searchBtn.innerHTML = '🔍 Search';
+  searchBtn.innerHTML = `
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+      <path fill="currentColor" d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 10-.71.71l.27.28v.79L20 21.5 21.5 20l-6-6zm-6 0A4.5 4.5 0 119.5 5a4.5 4.5 0 010 9z"/>
+    </svg>
+    <span>Search</span>
+  `;
 
   const locationBtn = document.createElement('button');
   locationBtn.type = 'button';
   locationBtn.classList.add('btn-location');
-  locationBtn.innerHTML = '📍 Use My Location';
+  locationBtn.innerHTML = `
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+      <path fill="currentColor" d="M12 2a7 7 0 00-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 00-7-7zm0 9.25A2.25 2.25 0 1112 6.75a2.25 2.25 0 010 4.5z"/>
+    </svg>
+    <span>Use My Location</span>
+  `;
   locationBtn.setAttribute('aria-label', 'Use my current location');
 
   inputWrapper.appendChild(autocompleteWrapper);
@@ -1510,6 +1551,7 @@ function createSearchSection(
   // Sort and filter controls row
   const controlsRow = document.createElement('div');
   controlsRow.classList.add('controls-row');
+  controlsRow.appendChild(viewToggle);
 
   // Sort controls
   const sortSection = document.createElement('div');
@@ -1742,7 +1784,6 @@ function createSearchSection(
 
   controlsRow.appendChild(filterSection);
   section.appendChild(form);
-  section.appendChild(viewToggle);
   section.appendChild(controlsRow);
 
   // Autocomplete functionality (Google Places or Nominatim)
@@ -2817,6 +2858,10 @@ export default async function decorate(block) {
   let userLocation = null;
   let mapInstance = null;
   let loadingSpinner; // Declared here, assigned later
+  if (!config.googleMapsApiKey && allStores.some((store) => store.requiresEnrichment)) {
+    clearPlaceDetailsCache();
+  }
+
   // Get available services from actual store data (for dynamic filters)
   const detectedServices = getAvailableServices(allStores);
   const configuredServices = Array.isArray(config.servicesFilter) ? config.servicesFilter : [];
@@ -2870,20 +2915,37 @@ export default async function decorate(block) {
   function updateFilterMeta(stores) {
     const { services, openNow, radius } = getSelectedFilters();
     const summaryParts = [`Showing ${stores.length} of ${allStores.length}`];
+    const chips = [];
+    const currentView = contentArea?.getAttribute('data-view') || config.defaultView || 'split';
+    chips.push(`${currentView.charAt(0).toUpperCase() + currentView.slice(1)} view`);
     if (userLocation) {
       if (radius > 0) {
+        chips.push(`Within ${radius} ${config.units === 'km' ? 'km' : 'mi'}`);
         summaryParts.push(`within ${radius} ${config.units === 'km' ? 'km' : 'mi'}`);
       } else {
+        chips.push('All distances');
         summaryParts.push('across all distances');
       }
+    } else {
+      chips.push('All distances');
     }
     if (openNow) {
+      chips.push('Open now');
       summaryParts.push('Open now');
     }
     if (services.length > 0) {
+      chips.push(`${services.length} filter${services.length === 1 ? '' : 's'}`);
       summaryParts.push(`${services.length} service filters`);
     }
-    resultsSummary.textContent = summaryParts.join(' · ');
+    const accessibleText = summaryParts.join(' · ');
+    const chipsMarkup = chips
+      .map((chip) => `<span class="summary-chip">${escapeHtml(chip)}</span>`)
+      .join('');
+    resultsSummary.setAttribute('aria-label', accessibleText);
+    resultsSummary.innerHTML = `
+      <span class="summary-count">${escapeHtml(summaryParts[0])}</span>
+      <span class="summary-chips" aria-hidden="true">${chipsMarkup}</span>
+    `;
     resultsSummary.hidden = false;
   }
 
