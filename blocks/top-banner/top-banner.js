@@ -216,22 +216,6 @@ function getTickerCellsForSource(row, source) {
   return [row.left, row.center, row.right];
 }
 
-function getMainBasePadding(main) {
-  if (!main) return 0;
-  const rootStyles = window.getComputedStyle(document.documentElement);
-  const navHeightRaw = rootStyles.getPropertyValue('--nav-height').trim();
-  const rootFontSize = Number.parseFloat(rootStyles.fontSize) || 16;
-  const navHeight = navHeightRaw.endsWith('rem')
-    ? (Number.parseFloat(navHeightRaw) || 0) * rootFontSize
-    : (Number.parseFloat(navHeightRaw) || 0);
-  const existing = Number(main.dataset.topBannerBasePadding || '');
-  if (Number.isFinite(existing) && existing >= navHeight) return existing;
-  const computedBase = Number.parseFloat(window.getComputedStyle(main).paddingTop) || 0;
-  const base = Math.max(computedBase, navHeight);
-  main.dataset.topBannerBasePadding = String(base);
-  return base;
-}
-
 function resolveContentGapValue(token) {
   const map = {
     none: '0px',
@@ -254,8 +238,7 @@ function applyPortableHeaderOffsets(heightPx, contentGap = 'none') {
   }
 
   if (main) {
-    const basePadding = getMainBasePadding(main);
-    main.style.paddingTop = `calc(${Math.round(basePadding + safeHeight)}px + ${gapValue})`;
+    main.style.paddingTop = `calc(${safeHeight}px + ${gapValue})`;
   }
 
   return {
@@ -274,6 +257,7 @@ function clearPortableHeaderOffsets() {
 
   if (main) {
     main.style.removeProperty('padding-top');
+    main.removeAttribute('data-top-banner-base-padding');
   }
 }
 
