@@ -1,51 +1,78 @@
 # Adobe Commerce Storefront Block Creation Rules (Codex)
 
-Apply these rules only for **block creation tasks** (new block scaffolding, initial DA.live config, and first-pass README/docs), typically involving:
+Apply these rules to **any new block creation** and to major first-pass rewrites of a block's architecture.
+
+Typical files:
 - `blocks/<new-block>/<new-block>.js`
 - `blocks/<new-block>/<new-block>.css`
 - `blocks/<new-block>/README.md`
 - `blocks/<new-block>/_<new-block>.json`
 
-Do **not** treat this file as mandatory for unrelated maintenance or small styling fixes in existing blocks unless explicitly requested.
+Do not force these rules for unrelated micro-fixes unless explicitly requested.
 
-Use the official Adobe Commerce Storefront docs as the source of truth:
+Use official Adobe Commerce Storefront documentation as source of truth:
 - https://experienceleague.adobe.com/developer/commerce/storefront/get-started/
 
-## Block Structure
+## Required Block Structure
 
-Every block should include:
+Every new block should include:
 - `block-name.js`
 - `block-name.css`
 - `README.md`
-- `_block-name.json` (DA.live configuration)
+- `_block-name.json` (DA.live config)
 
-## DA.live Section Metadata Integration
+## Metadata Contract Rules
 
-### Double-prefix pattern
+### Canonical API first
 
-DA.live section metadata may appear with double data prefixing. Prefer robust reads:
+- Define one canonical metadata API for the block.
+- Prefer preset-driven, condensed metadata over many overlapping knobs.
+- Do not add legacy aliases unless explicitly required by the task.
+- If aliases are required, document them in README and include a deprecation plan.
+
+### Block-specific metadata naming (required)
+
+- Metadata keys must be block-scoped; never use generic keys like `align`, `size`, `density`.
+- Use a compact block prefix derived from block name without internal hyphens.
+- Preferred author-facing format: `<blockprefix>-<field>`.
+  - Example block prefix for `hero-cta`: `herocta`.
+  - Example keys: `herocta-align`, `herocta-btnstyle`, `herocta-ctagap`.
+- Do not include `data-` in author-facing metadata key names.
+- Keep keys concise:
+  - one hyphen between prefix and field,
+  - no underscores,
+  - avoid extra hyphen chains in field names (prefer `contentwidth` over `content-max-width`).
+- Keep field tokens semantically clear and stable (`btn`, `cta`, `img` abbreviations are acceptable when consistently applied).
+
+### DA.live section metadata reads
+
+Section metadata may appear with double-prefix keys. Always read robustly from both:
+- `section.dataset.<blockprefixX>`
+- `section.dataset.data<blockprefixX>`
+
+Preferred pattern:
 
 ```js
-// preferred merge pattern
-const section = block.closest('.section');
-
-const config = {
-  align: block.dataset.align || section?.dataset.dataAlign || 'right',
-  size: block.dataset.size || section?.dataset.dataSize || 'medium',
-  intensity: block.dataset.gradientIntensity
-    || section?.dataset.dataGradientIntensity
-    || section?.dataset.dataGradientIntesity
-    || 'medium',
-};
-
-Object.entries(config).forEach(([key, value]) => {
-  block.dataset[key] = value;
-});
+function getConfigValue(blockValue, sectionData, keys, fallback) {
+  if (blockValue) return blockValue;
+  for (let i = 0; i < keys.length; i += 1) {
+    if (sectionData?.[keys[i]]) return sectionData[keys[i]];
+  }
+  return fallback;
+}
 ```
 
-### Normalization
+Example key resolution for `herocta-align`:
+- `section.dataset.heroctaAlign`
+- `section.dataset.dataHeroctaAlign`
 
-Validate author-provided options and fall back safely:
+### Normalize and persist
+
+- Validate every author-facing option and fall back safely.
+- Warn on invalid metadata values with block-prefixed warnings.
+- Persist resolved values to `block.dataset.*` so CSS reads a stable state.
+
+Example:
 
 ```js
 function normalizeAlign(value, fallback = 'right') {
@@ -54,110 +81,117 @@ function normalizeAlign(value, fallback = 'right') {
 }
 ```
 
-## CSS Rules
+## Security Requirements
 
-### Variant handling
+### URL safety (mandatory)
 
-Use data attributes, not ad-hoc variant classes:
+- Never trust authored `href`/`src` blindly.
+- Allow only safe protocols and safe relative forms.
+- Explicitly block unsafe protocols (`javascript:`, `data:`, etc.).
+- For `target="_blank"`, always enforce `rel="noopener noreferrer"`.
 
-```css
-.hero-cta[data-align='center'] .hero-content { text-align: center; }
-```
+Minimum allowed URL types:
+- `http:`
+- `https:`
+- `mailto:`
+- `tel:`
+- root-relative (`/path`)
+- relative (`./path`, `../path`)
+- hash anchors (`#id`)
 
-### Design tokens
+### HTML injection safety
 
-Prefer design tokens/custom properties over hardcoded values.
-
-### Specificity ordering
-
-Order selectors low-to-high specificity to satisfy stylelint and improve maintainability.
-
-### Color notation
-
-Prefer modern notation:
-
-```css
-background: rgb(0 0 0 / 55%);
-```
-
-### Additional CSS conventions
-
-- Use block-scoped class names.
-- Avoid `!important` unless absolutely required and documented.
-- Always provide visible `:focus-visible` styles.
-- Prefer concise shorthand where valid.
+- Do not inject unsanitized author content with `innerHTML`.
+- Build DOM with `createElement`/`textContent`.
+- Do not log raw `innerHTML` from authored cells in warnings.
 
 ## JavaScript Rules
 
 ### Architecture
 
 - Single default export: `export default function decorate(block) {}`.
-- Keep state local to block scope; avoid global state on `window`.
-- Scope queries to `block` when possible.
+- Keep state local to the block instance.
+- Scope queries to `block` whenever possible.
+- Prefer schema-based config resolution for maintainability.
 
-### Image optimization
+### Loading and lifecycle
 
-Use `createOptimizedPicture` with appropriate eager/lazy strategy (eager for LCP/hero, lazy elsewhere).
+- Use explicit loading state (`data-loading`).
+- Remove loading state on load/error and with timeout fallback.
+- Clean up timers/listeners when re-decorating or disconnecting paths are possible.
+- Pause autoplay/timers when page is hidden (`visibilitychange`).
+
+### Images and media
+
+- Use `createOptimizedPicture`.
+- Use eager loading for likely LCP media; lazy for non-LCP media.
+- Provide responsive breakpoints matched to real layout needs.
 
 ### Accessibility
 
-- Keyboard accessibility for interactive elements.
-- Correct ARIA/semantic usage.
+- Keyboard accessible interactions only.
+- Use semantic elements (`a` for navigation, `button` for actions).
+- Visible `:focus-visible` states are required.
 - Respect `prefers-reduced-motion`.
-- Maintain color contrast.
+- Maintain AA contrast for critical text/CTA states.
+- Minimum tap target: `44x44`.
 
-### Loading states
+## CSS Rules
 
-Use explicit loading states (`data-loading`) and clear them on completion with safe fallback timeout.
+### Variant model
 
-### Safety
+- Use data attributes for variants, not ad-hoc utility classes.
 
-- Do not inject unsanitized author/user content with `innerHTML`.
-- Validate `href/src`; disallow unsafe protocols (`javascript:` etc.).
-- For `target="_blank"`, include `rel="noopener noreferrer"`.
+Example:
 
-### Resilience
+```css
+.hero-cta[data-align='center'] .hero-content { text-align: center; }
+```
 
-- Graceful degradation and safe defaults.
-- Log actionable warnings with block prefix (e.g. `hero-cta: ...`).
+### Maintainability and performance
 
-## Performance
-
-- Progressive enhancement first.
-- Prefer plain JS unless complex state warrants Preact/HTM.
-- Minimize layout thrash (batch reads/writes).
-- Optimize for Core Web Vitals.
+- Use block-scoped selectors.
+- Keep selector specificity low-to-high (stylelint-friendly ordering).
+- Prefer design tokens and custom properties over hardcoded values.
+- Prefer modern color notation (`rgb(0 0 0 / 55%)`).
+- Avoid `transition: all`; transition only relevant properties.
+- Avoid `!important` unless strictly necessary and documented.
 
 ## README Requirements
 
-Block README files should include:
+Each block README must include:
 1. Overview
-2. DA.live integration (table/authoring structure)
+2. DA.live integration and authoring structure
 3. Configuration options
 4. Behavior patterns
-5. Accessibility
+5. Accessibility notes
 6. Troubleshooting
 
-Include section metadata placement guidance (immediately above block).
+### README tables are required
 
-### README Style Preferences
+Include both:
+- **DA.live Model Options**
+- **Section Metadata Reference**
 
-- Keep docs concise but context-rich: short intro, then actionable tables.
-- Use clear tables for both:
-  - DA.live Model Options
-  - Section Metadata Reference
-- Each table row should include:
-  - key/field
-  - default
-  - possible values
-  - effect (what changes visually/behaviorally)
-- Effect descriptions should be plain-language, specific, and outcome-focused (not vague labels).
-- Document supported aliases explicitly (for example `color/colour`) when implemented.
-- If new metadata options are introduced in code, update README in the same change.
+Each metadata row must include:
+- key/field
+- default
+- possible values
+- effect (plain-language, outcome-focused)
 
-## Linting Standards
+Also include:
+- Section Metadata placement guidance (immediately above block).
+- Supported aliases (only if intentionally implemented).
 
-All changes must pass:
+## DA.live JSON Config
+
+- Keep `_block-name.json` aligned with actual authoring shape.
+- `rows`/`columns` should match expected authoring table structure.
+- Avoid stale model fields that no longer map to behavior.
+
+## Linting and Quality Gates
+
+All block creation changes must pass:
 - ESLint (JS)
 - Stylelint (CSS)
 
@@ -169,17 +203,15 @@ npm run lint:js
 npm run lint:css
 ```
 
-Follow project lint style (line length, quotes, trailing commas, etc.).
-
-## HTML & Semantics
-
-- Use semantic elements (`button` for actions, `a` for navigation).
-- Keep heading hierarchy valid.
-- Use meaningful `alt` text; empty alt only for decorative images.
+Follow project conventions (line length, quotes, trailing commas, selector order, etc.).
 
 ## Before Shipping Checklist
 
-1. Run lint and fix issues.
-2. Verify DA.live metadata behavior (including double-prefix reads).
-3. Verify acceptable no-JS behavior for critical content/links.
-4. Verify mobile and desktop layout/tap targets (44x44 min tap target).
+1. Lint passes (`lint:js` and `lint:css`).
+2. Metadata resolution works for both single and double-prefix section keys.
+3. Invalid metadata safely falls back and logs actionable warnings.
+4. Unsafe URLs are blocked; `_blank` links include `noopener noreferrer`.
+5. No-JS behavior is acceptable for critical content and links.
+6. Motion respects `prefers-reduced-motion` and timers are lifecycle-safe.
+7. Mobile and desktop layouts are verified, including `44x44` tap targets.
+8. README and `_block-name.json` match implemented behavior.
