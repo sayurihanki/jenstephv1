@@ -226,6 +226,30 @@ function sanitizeUrl(url) {
   return '';
 }
 
+function sanitizeTarget(target) {
+  const normalized = (target || '').trim().toLowerCase();
+  if (['_blank', '_self', '_parent', '_top'].includes(normalized)) return normalized;
+  return '';
+}
+
+function setLinkTargetAttributes(anchor, target) {
+  if (!target || target === '_self') return;
+  anchor.target = target;
+  if (target === '_blank') {
+    anchor.rel = 'noopener noreferrer';
+  }
+}
+
+function readCellLink(cell) {
+  const anchor = cell?.querySelector('a[href]');
+  if (!anchor) return { label: '', href: '', target: '' };
+  return {
+    label: anchor.textContent.trim(),
+    href: sanitizeUrl(anchor.getAttribute('href') || ''),
+    target: sanitizeTarget(anchor.getAttribute('target') || ''),
+  };
+}
+
 function resolveButtonTextColor(colorValue) {
   const key = (colorValue || '').toLowerCase();
   const tokenMap = {
@@ -286,32 +310,84 @@ function warnOnNoOpConfig(name, rawValue, reason) {
   console.warn(`hero-cta: ${name} "${rawValue}" has no effect. ${reason}`);
 }
 
-/**
- * Separate nav rows from slide rows.
- * Nav rows have "nav" as the text in Column 1.
- */
-function separateNavRows(rows) {
+function parseTypedRows(rows) {
   const slideRows = [];
-  const navRows = [];
+  const navEntries = [];
+  let interval = DEFAULT_INTERVAL;
 
-  rows.forEach((row) => {
-    const firstCell = row.children[0];
-    const marker = (firstCell?.textContent || '').trim().toLowerCase();
-    if (marker === 'nav') {
-      navRows.push(row);
-    } else {
-      slideRows.push(row);
+  rows.forEach((row, index) => {
+    const cells = [...row.children];
+    const type = (cells[0]?.textContent || '').trim().toLowerCase();
+    const rowNum = index + 1;
+
+    if (!type) {
+      console.warn(`hero-cta: row ${rowNum} missing row type. Expected "slide", "nav", or "interval".`);
+      return;
     }
+
+    if (type === 'slide') {
+      slideRows.push(row);
+      return;
+    }
+
+    if (type === 'interval') {
+      const raw = cells[1]?.textContent?.trim() || '';
+      const ms = Number.parseInt(raw, 10);
+      if (!Number.isNaN(ms) && ms > 0) {
+        interval = ms;
+      } else {
+        console.warn(`hero-cta: row ${rowNum} interval "${raw}" is invalid. Using "${DEFAULT_INTERVAL}".`);
+      }
+      return;
+    }
+
+    if (type === 'nav') {
+      const mode = (cells[1]?.textContent || '').trim().toLowerCase() || 'item';
+      const labelCell = cells[2];
+      const hrefCell = cells[3];
+      const labelLink = readCellLink(labelCell);
+      const hrefLink = readCellLink(hrefCell);
+      const label = labelLink.label || labelCell?.textContent?.trim() || '';
+      const href = labelLink.href || hrefLink.href || sanitizeUrl(hrefCell?.textContent?.trim() || '');
+      const target = labelLink.target || hrefLink.target || '';
+
+      if (!label) {
+        console.warn(`hero-cta: row ${rowNum} nav entry has no label.`);
+        return;
+      }
+
+      if (mode === 'header') {
+        navEntries.push({
+          type: 'header',
+          label,
+        });
+        return;
+      }
+
+      navEntries.push({
+        type: 'item',
+        label,
+        href,
+        target,
+      });
+      return;
+    }
+
+    console.warn(`hero-cta: row ${rowNum} has unsupported type "${type}".`);
   });
 
-  return { slideRows, navRows };
+  return {
+    slideRows,
+    navEntries,
+    interval,
+  };
 }
 
 /**
- * Build sidebar navigation from nav rows.
- * Column 2: Link text or Text|URL format, or existing <a> tags
+ * Build sidebar navigation from typed nav entries.
+ * `header` renders non-clickable heading rows.
  */
-function buildSidebar(navRows) {
+function buildSidebar(navEntries) {
   const nav = document.createElement('nav');
   nav.className = 'hero-cta-sidebar';
   nav.setAttribute('aria-label', 'Hero navigation');
@@ -319,28 +395,27 @@ function buildSidebar(navRows) {
   const list = document.createElement('ul');
   list.className = 'hero-cta-sidebar-list';
 
-  navRows.forEach((row) => {
-    const linkCell = row.children[1];
-    if (!linkCell) return;
-
+  navEntries.forEach((entry) => {
     const li = document.createElement('li');
     li.className = 'hero-cta-sidebar-item';
 
-    // Check for existing <a> tag
-    const existingLink = linkCell.querySelector('a');
-    if (existingLink) {
-      existingLink.className = 'hero-cta-sidebar-link';
-      li.append(existingLink);
+    if (entry.type === 'header') {
+      const header = document.createElement('p');
+      header.className = 'hero-cta-sidebar-header';
+      header.textContent = entry.label;
+      li.append(header);
     } else {
-      const text = linkCell.textContent.trim();
-      if (!text) return;
-
       const link = document.createElement('a');
-      link.href = '#';
-      link.textContent = text;
       link.className = 'hero-cta-sidebar-link';
-      link.setAttribute('aria-disabled', 'true');
-      link.setAttribute('tabindex', '-1');
+      link.textContent = entry.label;
+      if (entry.href) {
+        link.href = entry.href;
+        setLinkTargetAttributes(link, entry.target);
+      } else {
+        link.href = '#';
+        link.setAttribute('aria-disabled', 'true');
+        link.setAttribute('tabindex', '-1');
+      }
 
       li.append(link);
     }
@@ -350,23 +425,6 @@ function buildSidebar(navRows) {
 
   nav.append(list);
   return nav;
-}
-
-function extractInterval(rows) {
-  const lastRow = rows[rows.length - 1];
-  if (!lastRow) return { interval: DEFAULT_INTERVAL, rows };
-
-  const cells = [...lastRow.children];
-  if (cells.length === 1) {
-    const raw = cells[0].textContent.trim();
-    const ms = parseInt(raw, 10);
-    if (!Number.isNaN(ms) && ms > 0) {
-      lastRow.remove();
-      return { interval: ms, rows: rows.slice(0, -1) };
-    }
-  }
-
-  return { interval: DEFAULT_INTERVAL, rows };
 }
 
 function extractImageSource(cell) {
@@ -412,14 +470,14 @@ function extractImageSource(cell) {
 
 function buildSlide(row, isFirstSlide = false, config = {}) {
   const cells = [...row.children];
-  const ctaTextCell = cells[1];
-  const ctaLinkCell = cells[2];
+  const ctaTextCell = cells[2];
+  const ctaLinkCell = cells[3];
 
   const slide = document.createElement('div');
   slide.className = 'hero-cta-slide';
 
   // Column 1: Image (flexible format support)
-  const imageData = extractImageSource(cells[0]);
+  const imageData = extractImageSource(cells[1]);
   if (imageData) {
     // Optimized breakpoints based on configured max width
     const maxWidth = config.imageMaxWidth || 2400;
@@ -746,10 +804,11 @@ export default function decorate(block) {
     ),
   };
 
-  const { interval, rows: allRows } = extractInterval(rows);
-
-  // Separate nav rows (Column 1 = "nav") from slide rows
-  const { slideRows, navRows } = separateNavRows(allRows);
+  const {
+    interval,
+    slideRows,
+    navEntries,
+  } = parseTypedRows(rows);
 
   const wrapper = document.createElement('div');
   wrapper.className = 'hero-cta-slides';
@@ -760,8 +819,8 @@ export default function decorate(block) {
 
   // Build sidebar if enabled and nav rows exist
   const sidebarPosition = normalizeSidebar(config.sidebar);
-  if (sidebarPosition && navRows.length > 0) {
-    const sidebar = buildSidebar(navRows);
+  if (sidebarPosition && navEntries.length > 0) {
+    const sidebar = buildSidebar(navEntries);
     const layout = document.createElement('div');
     layout.className = 'hero-cta-layout';
 
@@ -847,11 +906,11 @@ export default function decorate(block) {
   if (layoutConfig.sidebarPosition && layoutConfig.layoutWidthRaw === 'full-width') {
     console.warn('hero-cta: herocta-width "full-width" is ignored when herocta-sidebar is enabled. Using "default".');
   }
-  if (layoutConfig.sidebarPosition && navRows.length === 0 && hasExplicitConfig.sidebar) {
+  if (layoutConfig.sidebarPosition && navEntries.length === 0 && hasExplicitConfig.sidebar) {
     warnOnNoOpConfig(
       'herocta-sidebar',
       config.sidebar,
-      'No nav rows are authored (Column 1 must be "nav"), so sidebar cannot render.',
+      'No typed nav rows are authored (Column 1 must be "nav"), so sidebar cannot render.',
     );
   }
   if (styleConfig.buttonStyle === 'link') {

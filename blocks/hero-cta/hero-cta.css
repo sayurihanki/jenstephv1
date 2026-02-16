@@ -688,6 +688,14 @@
   margin: 0;
 }
 
+.hero-cta-sidebar-header {
+  color: var(--color-neutral-600);
+  font: var(--type-details-caption-2-font);
+  letter-spacing: 0.08em;
+  margin: 8px 8px 4px;
+  text-transform: uppercase;
+}
+
 .hero-cta-sidebar-link {
   display: block;
   padding: 10px 8px;
