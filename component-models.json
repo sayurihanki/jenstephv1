@@ -179,6 +179,10 @@
     ]
   },
   {
+    "id": "blog-post",
+    "fields": []
+  },
+  {
     "id": "card",
     "fields": [
       {
